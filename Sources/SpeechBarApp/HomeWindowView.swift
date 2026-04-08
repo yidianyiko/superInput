@@ -1101,7 +1101,7 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "模型",
                 title: "接口与模型配置",
-                subtitle: "可在 Deepgram、Whisper API、本地 Whisper 与本地 SenseVoice 间切换。"
+                subtitle: "可在 Deepgram、Whisper API、本地 Whisper、本地 SenseVoice 间切换。"
             )
 
             HStack(alignment: .top, spacing: 18) {
@@ -1240,7 +1240,7 @@ struct HomeWindowView: View {
                                 }
                                 .buttonStyle(SecondaryPanelButtonStyle(palette: store.palette))
                             }
-                        } else {
+                        } else if modelSettingsStore.selectedSpeechProvider == .localSenseVoice {
                             modelField(title: "默认模型", text: $modelSettingsStore.configuration.localSenseVoiceModel, editable: false)
                             modelField(title: "语言", text: $modelSettingsStore.configuration.localSenseVoiceLanguage)
                             modelField(title: "模型目录", text: .constant(senseVoiceModelStore.modelsDirectory.path), editable: false)

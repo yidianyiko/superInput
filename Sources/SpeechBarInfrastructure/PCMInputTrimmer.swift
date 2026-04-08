@@ -10,10 +10,12 @@ enum PCMInputTrimmer {
     static func trimMonoInt16PCM(
         _ data: Data,
         sampleRate: Int,
-        amplitudeThreshold: Int16 = 160,
-        leadingPaddingMilliseconds: Int = 80,
-        trailingPaddingMilliseconds: Int = 140,
-        blockMilliseconds: Int = 10
+        amplitudeThreshold: Int16 = 80,
+        leadingPaddingMilliseconds: Int = 260,
+        trailingPaddingMilliseconds: Int = 180,
+        blockMilliseconds: Int = 10,
+        minimumLeadingRetainedMilliseconds: Int = 0,
+        prependLeadingSilenceMilliseconds: Int = 0
     ) -> TrimmedPCMInput {
         guard data.count >= MemoryLayout<Int16>.size else {
             return TrimmedPCMInput(data: data, leadingSamplesTrimmed: 0, trailingSamplesTrimmed: 0)
@@ -55,19 +57,34 @@ enum PCMInputTrimmer {
 
         let trimmedStart = max(0, firstSpeechSample - leadingPaddingSamples)
         let trimmedEnd = min(samples.count, lastSpeechSample + trailingPaddingSamples)
+        let minimumLeadingRetainedSamples = max(
+            0,
+            sampleRate * minimumLeadingRetainedMilliseconds / 1_000
+        )
+        let adjustedTrimmedStart = min(trimmedStart, minimumLeadingRetainedSamples)
+        let prependedSilenceSamples = max(
+            0,
+            sampleRate * prependLeadingSilenceMilliseconds / 1_000
+        )
 
-        guard trimmedStart > 0 || trimmedEnd < samples.count else {
+        guard adjustedTrimmedStart > 0 || trimmedEnd < samples.count || prependedSilenceSamples > 0 else {
             return TrimmedPCMInput(data: data, leadingSamplesTrimmed: 0, trailingSamplesTrimmed: 0)
         }
 
-        let trimmedSamples = Array(samples[trimmedStart..<trimmedEnd])
-        let trimmedData = trimmedSamples.withUnsafeBufferPointer { buffer in
+        let retainedSamples = Array(samples[adjustedTrimmedStart..<trimmedEnd])
+        let finalSamples: [Int16]
+        if prependedSilenceSamples > 0 {
+            finalSamples = Array(repeating: 0, count: prependedSilenceSamples) + retainedSamples
+        } else {
+            finalSamples = retainedSamples
+        }
+        let trimmedData = finalSamples.withUnsafeBufferPointer { buffer in
             Data(buffer: buffer)
         }
 
         return TrimmedPCMInput(
             data: trimmedData,
-            leadingSamplesTrimmed: trimmedStart,
+            leadingSamplesTrimmed: adjustedTrimmedStart,
             trailingSamplesTrimmed: samples.count - trimmedEnd
         )
     }

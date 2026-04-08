@@ -23,6 +23,7 @@ final class MockAudioInputSource: AudioInputSource, @unchecked Sendable {
     private let levelsContinuation: AsyncStream<AudioLevelSample>.Continuation
     var permissionStatus: AudioInputPermissionStatus = .granted
     var startError: Error?
+    private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
     private var continuation: AsyncThrowingStream<AudioChunk, Error>.Continuation?
 
@@ -42,6 +43,7 @@ final class MockAudioInputSource: AudioInputSource, @unchecked Sendable {
         if let startError {
             throw startError
         }
+        startCallCount += 1
 
         return AsyncThrowingStream { continuation in
             self.continuation = continuation

@@ -190,7 +190,6 @@ private final class SnapshotEnvironment {
             defaultLocalSenseVoiceModelName: senseVoiceModelStore.defaultModel.name,
             senseVoiceRuntimeDirectory: senseVoiceModelStore.runtimeDirectory
         )
-
         self.modelSettingsStore = OpenAIModelSettingsStore(
             defaults: defaults,
             deepgramCredentialProvider: deepgramCredentialProvider,

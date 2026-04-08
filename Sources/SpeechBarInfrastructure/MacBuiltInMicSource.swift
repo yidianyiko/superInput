@@ -18,6 +18,20 @@ private func debugLog(_ message: String) {
     }
 }
 
+public enum MacBuiltInMicSourceError: LocalizedError {
+    case preferredInputDeviceUnavailable(String)
+    case preferredInputDeviceActivationFailed(String, OSStatus)
+
+    public var errorDescription: String? {
+        switch self {
+        case .preferredInputDeviceUnavailable:
+            return "无法找到你设定的麦克风，请检查设备连接或在设置里重新选择。"
+        case .preferredInputDeviceActivationFailed:
+            return "无法启用你设定的麦克风，请检查设备权限和连接状态。"
+        }
+    }
+}
+
 public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked Sendable {
     public let audioLevels: AsyncStream<AudioLevelSample>
 
@@ -30,8 +44,10 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
     private let stateLock = NSLock()
     private let targetFormat: AVAudioFormat
     private let audioLevelsContinuation: AsyncStream<AudioLevelSample>.Continuation
-    private let preRollBytesTarget = 8_000
+    private let preRollBytesTarget = 6_400
     private let tailGraceDuration: Duration = .milliseconds(120)
+    private let silentBufferFallbackThreshold = 6
+    private let silencePeakThreshold = 0.0035
 
     private var converter: AVAudioConverter?
     private var continuation: AsyncThrowingStream<AudioChunk, Error>.Continuation?
@@ -39,6 +55,9 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
     private var pendingPreRollChunks: [AudioChunk] = []
     private var pendingPreRollByteCount = 0
     private var hasFlushedPreRoll = false
+    private var overrideInputDeviceUID: String?
+    private var silentBufferCount = 0
+    private var hasScheduledInputFallback = false
 
     public init(
         preferredDeviceUIDProvider: @escaping @Sendable () -> String? = { nil }
@@ -125,14 +144,14 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
 
     private func configureAudioEngine() throws {
         let inputNode = engine.inputNode
-        applyPreferredInputDeviceIfPossible(to: inputNode)
+        try applyPreferredInputDeviceIfPossible(to: inputNode)
         let inputFormat = inputNode.inputFormat(forBus: 0)
         setConverter(AVAudioConverter(from: inputFormat, to: targetFormat))
 
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(
             onBus: 0,
-            bufferSize: 1_024,
+            bufferSize: 256,
             format: inputFormat,
             block: makeAudioTapBlock(
                 owner: self,
@@ -151,14 +170,42 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
         }
     }
 
-    private func applyPreferredInputDeviceIfPossible(to inputNode: AVAudioInputNode) {
-        guard
-            let preferredDeviceUID = preferredDeviceUIDProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !preferredDeviceUID.isEmpty,
-            let preferredDeviceID = AudioInputDeviceCatalog.deviceID(forUID: preferredDeviceUID),
-            let audioUnit = inputNode.audioUnit
-        else {
+    private func applyPreferredInputDeviceIfPossible(to inputNode: AVAudioInputNode) throws {
+        if let overrideInputDeviceUID,
+           let overrideDeviceID = AudioInputDeviceCatalog.deviceID(forUID: overrideInputDeviceUID),
+           let audioUnit = inputNode.audioUnit {
+            var deviceID = overrideDeviceID
+            let status = AudioUnitSetProperty(
+                audioUnit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &deviceID,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+
+            if status != noErr {
+                debugLog("failed to switch override input device, status=\(status), uid=\(overrideInputDeviceUID)")
+                self.overrideInputDeviceUID = nil
+            } else {
+                debugLog("using override input device uid=\(overrideInputDeviceUID)")
+                return
+            }
+        }
+
+        guard let preferredDeviceUID = preferredDeviceUIDProvider()?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !preferredDeviceUID.isEmpty else {
             return
+        }
+
+        guard let preferredDeviceID = AudioInputDeviceCatalog.deviceID(forUID: preferredDeviceUID) else {
+            debugLog("preferred input device unavailable uid=\(preferredDeviceUID)")
+            throw MacBuiltInMicSourceError.preferredInputDeviceUnavailable(preferredDeviceUID)
+        }
+
+        guard let audioUnit = inputNode.audioUnit else {
+            debugLog("input audio unit unavailable for preferred uid=\(preferredDeviceUID)")
+            throw MacBuiltInMicSourceError.preferredInputDeviceActivationFailed(preferredDeviceUID, noErr)
         }
 
         var deviceID = preferredDeviceID
@@ -173,6 +220,7 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
 
         if status != noErr {
             debugLog("failed to switch preferred input device, status=\(status), uid=\(preferredDeviceUID)")
+            throw MacBuiltInMicSourceError.preferredInputDeviceActivationFailed(preferredDeviceUID, status)
         } else {
             debugLog("using preferred input device uid=\(preferredDeviceUID)")
         }
@@ -245,6 +293,10 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
             count: Int(convertedBuffer.frameLength)
         )
         audioLevelsContinuation.yield(audioLevelSample)
+        monitorSilenceAndFallbackIfNeeded(
+            levelSample: audioLevelSample,
+            currentSequence: sequenceNumber
+        )
 
         // Log converted data info once
         if sequenceNumber == 0 {
@@ -282,6 +334,9 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
         self.pendingPreRollChunks = []
         self.pendingPreRollByteCount = 0
         self.hasFlushedPreRoll = false
+        self.overrideInputDeviceUID = nil
+        self.silentBufferCount = 0
+        self.hasScheduledInputFallback = false
         stateLock.unlock()
     }
 
@@ -342,8 +397,88 @@ public final class MacBuiltInMicSource: NSObject, AudioInputSource, @unchecked S
         }
 
         let rms = sqrt(squareSum / Double(count))
-        let uiLevel = min(1.0, max(0.0, rms * 10.0))
-        return AudioLevelSample(level: uiLevel, peak: min(1.0, peak))
+        let boostedRMS = min(1.0, max(0.0, rms * 18.0))
+        let boostedPeak = min(1.0, peak * 1.45)
+        let uiLevel = min(1.0, max(pow(boostedRMS, 0.72), boostedPeak * 0.55))
+        return AudioLevelSample(level: uiLevel, peak: boostedPeak)
+    }
+
+    private func monitorSilenceAndFallbackIfNeeded(
+        levelSample: AudioLevelSample,
+        currentSequence: Int64
+    ) {
+        let preferredUID = preferredDeviceUIDProvider()?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let preferredUID, !preferredUID.isEmpty {
+            return
+        }
+
+        guard overrideInputDeviceUID == nil else { return }
+        guard currentSequence < 64 else { return }
+
+        let activeInputUID = preferredUID?.isEmpty == false
+            ? preferredUID
+            : AudioInputDeviceCatalog.defaultInputDevice()?.uid
+
+        guard let activeInputUID else { return }
+
+        if currentSequence < Int64(silentBufferFallbackThreshold) {
+            debugLog(
+                "input peak sample seq=\(currentSequence) peak=\(String(format: "%.6f", levelSample.peak)) level=\(String(format: "%.6f", levelSample.level))"
+            )
+        }
+
+        if levelSample.peak <= silencePeakThreshold {
+            silentBufferCount += 1
+        } else {
+            silentBufferCount = 0
+        }
+
+        guard silentBufferCount >= silentBufferFallbackThreshold else { return }
+        guard !hasScheduledInputFallback else { return }
+
+        hasScheduledInputFallback = true
+        let fallbackDevice = AudioInputDeviceCatalog.fallbackInputDevice(avoidingUID: activeInputUID)
+        if let fallbackDevice {
+            debugLog(
+                "active input device appears silent, falling back from uid=\(activeInputUID) to uid=\(fallbackDevice.uid)"
+            )
+        } else {
+            debugLog("active input device appears silent, but no alternate input device was found")
+        }
+
+        fallbackToAlternateInput(deviceUID: fallbackDevice?.uid)
+    }
+
+    private func fallbackToAlternateInput(deviceUID: String?) {
+        stateLock.lock()
+        let hasActiveContinuation = continuation != nil
+        stateLock.unlock()
+        guard hasActiveContinuation else { return }
+
+        overrideInputDeviceUID = deviceUID
+        silentBufferCount = 0
+
+        engine.inputNode.removeTap(onBus: 0)
+        engine.stop()
+        engine.reset()
+        clearConverter()
+
+        do {
+            try configureAudioEngine()
+            if let deviceUID {
+                debugLog("successfully reconfigured audio engine with alternate input uid=\(deviceUID)")
+            } else {
+                debugLog("successfully reconfigured audio engine without a forced input device")
+            }
+        } catch {
+            if let deviceUID {
+                debugLog("failed to reconfigure audio engine with alternate input uid=\(deviceUID): \(error.localizedDescription)")
+            } else {
+                debugLog("failed to reconfigure audio engine without a forced input device: \(error.localizedDescription)")
+            }
+        }
     }
 }
 

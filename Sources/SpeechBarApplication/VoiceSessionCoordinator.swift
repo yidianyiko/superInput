@@ -23,7 +23,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     @Published public private(set) var rawFinalTranscript = ""
     @Published public private(set) var interimTranscript = ""
     @Published public private(set) var finalTranscript = ""
-    @Published public private(set) var statusMessage = "Ready"
+    @Published public private(set) var statusMessage = "已就绪"
     @Published public private(set) var credentialStatus: CredentialStatus = .missing
     @Published public private(set) var isPushToTalkActive = false
     @Published public private(set) var lastCompletedTranscript: PublishedTranscript?
@@ -39,12 +39,14 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private let transcriptionClient: any TranscriptionClient
     private let credentialProvider: any CredentialProvider
     private let transcriptPublisher: any TranscriptPublisher
+    private let streamingTranscriptPublisher: (any StreamingTranscriptPublisher)?
     private let windowSwitcher: (any WindowSwitching)?
     private let transcriptTargetCapturer: (any TranscriptTargetCapturing)?
     private let userProfileProvider: (any UserProfileContextProviding)?
     private let transcriptPostProcessor: (any TranscriptPostProcessor)?
     private let baseConfiguration: LiveTranscriptionConfiguration
     private let sleepClock: any SleepClock
+    private let shouldUseIncrementalInterimPublishing: @Sendable () -> Bool
 
     private var hardwareTask: Task<Void, Never>?
     private var transcriptionEventTask: Task<Void, Never>?
@@ -59,6 +61,12 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private var shouldFinalizeWhenReady = false
     private var isCompletingActiveSession = false
     private var finalSegments: [String] = []
+    private var isTranscriptionConnectionReady = false
+    private var pendingConnectionAudioChunks: [AudioChunk] = []
+    private var pendingConnectionAudioBytes = 0
+    private let maxPendingConnectionAudioBytes = 160_000
+    private let finalizeRequestTimeout: Duration = .seconds(10)
+    private var isStreamingInterimPublishingActive = false
 
     public init(
         hardwareSource: any HardwareEventSource,
@@ -66,24 +74,28 @@ public final class VoiceSessionCoordinator: ObservableObject {
         transcriptionClient: any TranscriptionClient,
         credentialProvider: any CredentialProvider,
         transcriptPublisher: any TranscriptPublisher,
+        streamingTranscriptPublisher: (any StreamingTranscriptPublisher)? = nil,
         windowSwitcher: (any WindowSwitching)? = nil,
         transcriptTargetCapturer: (any TranscriptTargetCapturing)? = nil,
         userProfileProvider: (any UserProfileContextProviding)? = nil,
         transcriptPostProcessor: (any TranscriptPostProcessor)? = nil,
         configuration: LiveTranscriptionConfiguration = LiveTranscriptionConfiguration(),
-        sleepClock: any SleepClock = ContinuousSleepClock()
+        sleepClock: any SleepClock = ContinuousSleepClock(),
+        shouldUseIncrementalInterimPublishing: @escaping @Sendable () -> Bool = { false }
     ) {
         self.hardwareSource = hardwareSource
         self.audioInputSource = audioInputSource
         self.transcriptionClient = transcriptionClient
         self.credentialProvider = credentialProvider
         self.transcriptPublisher = transcriptPublisher
+        self.streamingTranscriptPublisher = streamingTranscriptPublisher
         self.windowSwitcher = windowSwitcher
         self.transcriptTargetCapturer = transcriptTargetCapturer
         self.userProfileProvider = userProfileProvider
         self.transcriptPostProcessor = transcriptPostProcessor
         self.baseConfiguration = configuration
         self.sleepClock = sleepClock
+        self.shouldUseIncrementalInterimPublishing = shouldUseIncrementalInterimPublishing
         self.credentialStatus = credentialProvider.credentialStatus()
     }
 
@@ -236,53 +248,31 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeSessionID = sessionID
         shouldFinalizeWhenReady = false
         isCompletingActiveSession = false
+        isStreamingInterimPublishingActive = shouldUseIncrementalInterimPublishing()
         finalSegments = []
+        isTranscriptionConnectionReady = false
+        pendingConnectionAudioChunks = []
+        pendingConnectionAudioBytes = 0
         rawFinalTranscript = ""
         interimTranscript = ""
         finalTranscript = ""
         lastPolishFallbackReason = nil
-        statusMessage = "Preparing microphone..."
+        statusMessage = "正在准备麦克风..."
         isPushToTalkActive = true
         sessionState = .requestingPermission
         activeSessionStartedAt = Date()
         overlayPhase = .recording
-        overlaySubtitle = "Listening"
+        overlaySubtitle = "监听中"
         audioLevelWindow = []
-
-        let apiKey: String
-        do {
-            apiKey = try credentialProvider.loadAPIKey()
-        } catch {
-            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-            await failActiveSession(
-                message: message.isEmpty ? "Transcription service is not ready." : message
-            )
-            return
+        if isStreamingInterimPublishingActive {
+            await streamingTranscriptPublisher?.beginStreamingSession()
         }
 
         let permission = await audioInputSource.requestRecordPermission()
         guard isCurrentSession(sessionID) else { return }
 
         guard permission == .granted else {
-            await failActiveSession(message: "Microphone permission is required.")
-            return
-        }
-
-        sessionState = .connecting
-        statusMessage = "Connecting to transcription service..."
-
-        let context = await currentUserProfileContext()
-        let sessionConfiguration = makeSessionConfiguration(context: context)
-
-        do {
-            try await transcriptionClient.connect(apiKey: apiKey, configuration: sessionConfiguration)
-        } catch {
-            await failActiveSession(message: "Could not connect to the transcription service.")
-            return
-        }
-
-        guard isCurrentSession(sessionID) else {
-            await transcriptionClient.close()
+            await failActiveSession(message: "需要授予麦克风权限。")
             return
         }
 
@@ -290,7 +280,10 @@ public final class VoiceSessionCoordinator: ObservableObject {
         do {
             audioStream = try await audioInputSource.startCapture()
         } catch {
-            await failActiveSession(message: "Could not start audio capture.")
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            await failActiveSession(
+                message: message.isEmpty ? "无法启动录音。" : message
+            )
             return
         }
 
@@ -300,23 +293,60 @@ public final class VoiceSessionCoordinator: ObservableObject {
             return
         }
 
+        let apiKey: String
+        do {
+            apiKey = try credentialProvider.loadAPIKey()
+        } catch {
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            await failActiveSession(
+                message: message.isEmpty ? "转写服务尚未准备好。" : message
+            )
+            return
+        }
+
         audioTask = Task { [weak self] in
             guard let self else { return }
             do {
                 for try await chunk in audioStream {
-                    try await self.transcriptionClient.send(audioChunk: chunk)
+                    try await self.handleCapturedAudioChunk(chunk)
                 }
             } catch is CancellationError {
                 return
             } catch {
-                await self.failActiveSession(message: "Uploading audio to the transcription service failed.")
+                await self.failActiveSession(message: "上传音频到转写服务失败。")
             }
         }
 
+        sessionState = .connecting
+        statusMessage = "正在连接转写服务..."
+
+        let context = await currentUserProfileContext()
+        let sessionConfiguration = makeSessionConfiguration(context: context)
+
+        do {
+            try await transcriptionClient.connect(apiKey: apiKey, configuration: sessionConfiguration)
+        } catch {
+            await failActiveSession(message: "无法连接转写服务。")
+            return
+        }
+
+        guard isCurrentSession(sessionID) else {
+            await transcriptionClient.close()
+            return
+        }
+
+        isTranscriptionConnectionReady = true
+        do {
+            try await flushPendingConnectionAudioChunks()
+        } catch {
+            await failActiveSession(message: "上传音频到转写服务失败。")
+            return
+        }
+
         sessionState = .recording
-        statusMessage = "Listening..."
+        statusMessage = "正在监听..."
         overlayPhase = .recording
-        overlaySubtitle = "Listening"
+        overlaySubtitle = "监听中"
 
         if shouldFinalizeWhenReady {
             await finalizeActiveSession()
@@ -329,7 +359,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         switch sessionState {
         case .requestingPermission, .connecting:
             shouldFinalizeWhenReady = true
-            statusMessage = "Stopping..."
+            statusMessage = "正在停止..."
         case .recording:
             await finalizeActiveSession()
         case .idle, .finalizing, .failed:
@@ -342,11 +372,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
         guard sessionState != .finalizing else { return }
 
         sessionState = .finalizing
-        statusMessage = "Finalizing transcript..."
+        statusMessage = "正在完成转写..."
         shouldFinalizeWhenReady = false
         activeFinalizeStartedAt = Date()
         overlayPhase = .finalizing
-        overlaySubtitle = "Transcribing"
+        overlaySubtitle = "转写中"
         if let activeSessionStartedAt {
             performanceLog(
                 "finalize started, captureDuration=\(String(format: "%.3f", Date().timeIntervalSince(activeSessionStartedAt)))s"
@@ -358,9 +388,9 @@ public final class VoiceSessionCoordinator: ObservableObject {
         await audioInputSource.stopCapture()
 
         do {
-            try await transcriptionClient.finalize()
+            try await finalizeTranscriptionRequest()
         } catch {
-            await failActiveSession(message: "Could not finalize the transcription request.")
+            await failActiveSession(message: "无法完成本次转写。")
             return
         }
 
@@ -382,19 +412,26 @@ public final class VoiceSessionCoordinator: ObservableObject {
         switch event {
         case .opened:
             if sessionState == .connecting {
-                statusMessage = "Transcription connection open."
+                statusMessage = "转写连接已建立。"
             }
 
         case .speechStarted:
             if sessionState == .recording || sessionState == .finalizing {
-                statusMessage = "Speech detected."
+                statusMessage = "已检测到语音。"
             }
 
         case .interim(let text):
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             interimTranscript = text
+            if isStreamingInterimPublishingActive {
+                do {
+                    _ = try await streamingTranscriptPublisher?.updateStreamingTranscript(text)
+                } catch {
+                    performanceLog("streaming interim publish failed: \(error.localizedDescription)")
+                }
+            }
             if sessionState == .recording {
-                statusMessage = "Transcribing live..."
+                statusMessage = "正在实时转写..."
             }
 
         case .final(let text):
@@ -404,7 +441,14 @@ public final class VoiceSessionCoordinator: ObservableObject {
             rawFinalTranscript = finalSegments.joined(separator: " ")
             finalTranscript = rawFinalTranscript
             interimTranscript = ""
-            statusMessage = "Transcript updated."
+            if isStreamingInterimPublishingActive {
+                do {
+                    _ = try await streamingTranscriptPublisher?.updateStreamingTranscript(rawFinalTranscript)
+                } catch {
+                    performanceLog("streaming final publish failed: \(error.localizedDescription)")
+                }
+            }
+            statusMessage = "转写结果已更新。"
 
         case .utteranceEnded:
             if sessionState == .finalizing {
@@ -432,9 +476,12 @@ public final class VoiceSessionCoordinator: ObservableObject {
         finalizeTimeoutTask?.cancel()
         finalizeTimeoutTask = nil
 
-        let transcript = finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        var transcript = finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        if transcript.isEmpty, isStreamingInterimPublishingActive {
+            transcript = interimTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if transcript.isEmpty {
-            await failActiveSession(message: "No speech was detected. Try again.")
+            await failActiveSession(message: "没有检测到语音，请重试。")
             return
         }
 
@@ -442,7 +489,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         let polishedTranscript: String
         if shouldAttemptPolish(transcript: transcript, context: context) {
             overlayPhase = .polishing
-            overlaySubtitle = "Polishing"
+            overlaySubtitle = "润色中"
             if let activeFinalizeStartedAt {
                 performanceLog(
                     "transcription finished, rawChars=\(transcript.count), transcriptionLatency=\(String(format: "%.3f", Date().timeIntervalSince(activeFinalizeStartedAt)))s"
@@ -468,9 +515,15 @@ public final class VoiceSessionCoordinator: ObservableObject {
         let deliveryOutcome: TranscriptDeliveryOutcome
         do {
             overlayPhase = .publishing
-            overlaySubtitle = "Pasting"
+            overlaySubtitle = isStreamingInterimPublishingActive ? "更新中" : "粘贴中"
             let publishStartedAt = Date()
-            deliveryOutcome = try await transcriptPublisher.publish(publishedTranscript)
+            if isStreamingInterimPublishingActive, let streamingTranscriptPublisher {
+                deliveryOutcome = try await streamingTranscriptPublisher.finishStreamingSession(
+                    finalText: polishedTranscript
+                )
+            } else {
+                deliveryOutcome = try await transcriptPublisher.publish(publishedTranscript)
+            }
             performanceLog(
                 "publish finished, publishLatency=\(String(format: "%.3f", Date().timeIntervalSince(publishStartedAt)))s"
             )
@@ -480,7 +533,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
             overlayPhase = .hidden
             overlaySubtitle = ""
             statusMessage = error.localizedDescription.isEmpty
-                ? "Transcript ready, but it could not be inserted into the active app."
+                ? "转写已完成，但无法插入到当前应用。"
                 : error.localizedDescription
             return
         }
@@ -499,15 +552,15 @@ public final class VoiceSessionCoordinator: ObservableObject {
         overlaySubtitle = ""
         switch deliveryOutcome {
         case .insertedIntoFocusedApp:
-            statusMessage = "Transcript inserted into the focused app."
+            statusMessage = "转写内容已插入到当前应用。"
         case .typedIntoFocusedApp:
-            statusMessage = "Transcript typed into the focused app."
+            statusMessage = "转写内容已实时输入到当前应用。"
         case .pasteShortcutSent:
-            statusMessage = "Transcript recognized. Paste was sent and the text is also in your clipboard. If it did not appear, press Command+V."
+            statusMessage = "转写完成，已发送粘贴，同时文本也已写入剪贴板。如未出现，请手动按 Command+V。"
         case .copiedToClipboard:
-            statusMessage = "Transcript recognized and copied to your clipboard. Click the chat box and press Command+V."
+            statusMessage = "转写完成，文本已复制到剪贴板。请点击输入框后按 Command+V。"
         case .publishedOnly:
-            statusMessage = "Transcript recognized."
+            statusMessage = "转写完成。"
         }
     }
 
@@ -534,9 +587,14 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeSessionStartedAt = nil
         activeFinalizeStartedAt = nil
         audioLevelWindow = []
+        isTranscriptionConnectionReady = false
+        pendingConnectionAudioChunks = []
+        pendingConnectionAudioBytes = 0
+        isStreamingInterimPublishingActive = false
 
         await audioInputSource.stopCapture()
         await transcriptionClient.close()
+        await streamingTranscriptPublisher?.cancelStreamingSession()
         await transcriptTargetCapturer?.clearCapturedTarget()
     }
 
@@ -544,6 +602,10 @@ public final class VoiceSessionCoordinator: ObservableObject {
         guard activeSessionID != nil else { return }
         await teardownActiveSession()
         finalSegments = []
+        isTranscriptionConnectionReady = false
+        pendingConnectionAudioChunks = []
+        pendingConnectionAudioBytes = 0
+        isStreamingInterimPublishingActive = false
         rawFinalTranscript = ""
         interimTranscript = ""
         finalTranscript = ""
@@ -551,7 +613,56 @@ public final class VoiceSessionCoordinator: ObservableObject {
         sessionState = .idle
         overlayPhase = .hidden
         overlaySubtitle = ""
-        statusMessage = "Recording canceled."
+        statusMessage = "已取消录音。"
+    }
+
+    private func handleCapturedAudioChunk(_ chunk: AudioChunk) async throws {
+        guard activeSessionID != nil else { return }
+
+        if isTranscriptionConnectionReady {
+            try await transcriptionClient.send(audioChunk: chunk)
+            return
+        }
+
+        pendingConnectionAudioChunks.append(chunk)
+        pendingConnectionAudioBytes += chunk.data.count
+
+        while pendingConnectionAudioBytes > maxPendingConnectionAudioBytes,
+              let first = pendingConnectionAudioChunks.first {
+            pendingConnectionAudioChunks.removeFirst()
+            pendingConnectionAudioBytes -= first.data.count
+        }
+    }
+
+    private func flushPendingConnectionAudioChunks() async throws {
+        guard !pendingConnectionAudioChunks.isEmpty else { return }
+        let chunks = pendingConnectionAudioChunks
+        pendingConnectionAudioChunks = []
+        pendingConnectionAudioBytes = 0
+
+        for chunk in chunks {
+            try await transcriptionClient.send(audioChunk: chunk)
+        }
+    }
+
+    private func finalizeTranscriptionRequest() async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await self.transcriptionClient.finalize()
+            }
+            group.addTask {
+                try await self.sleepClock.sleep(for: self.finalizeRequestTimeout)
+                throw NSError(
+                    domain: "VoiceSessionCoordinator",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Finalize timed out."]
+                )
+            }
+
+            let result = try await group.next()
+            group.cancelAll()
+            _ = result
+        }
     }
 
     private func isCurrentSession(_ sessionID: UUID) -> Bool {

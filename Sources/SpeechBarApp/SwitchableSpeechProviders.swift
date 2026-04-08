@@ -27,9 +27,7 @@ private struct LocalWhisperModelLocator: Sendable {
 
     func resolvedModelURL(preferredModelName: String?) -> URL? {
         let fileManager = FileManager.default
-
-        let normalizedPreferred = preferredModelName?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPreferred = preferredModelName?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let normalizedPreferred, !normalizedPreferred.isEmpty {
             let preferredURL = modelURL(forModelNamed: normalizedPreferred)
@@ -69,8 +67,7 @@ private struct SenseVoiceModelLocator: Sendable {
 
     func resolvedModelDirectory(preferredModelName: String?) -> URL? {
         let fileManager = FileManager.default
-        let normalizedPreferred = preferredModelName?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedPreferred = preferredModelName?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let normalizedPreferred, !normalizedPreferred.isEmpty {
             let preferredURL = modelDirectory(forModelNamed: normalizedPreferred)
@@ -253,7 +250,9 @@ final class LocalSenseVoiceModelCredentialProvider: CredentialProvider, @uncheck
 
     func credentialStatus() -> CredentialStatus {
         let storedConfiguration = OpenAIModelSettingsStore.StoredConfiguration.load(from: defaults)
-        let hasModel = modelLocator.credentialStatus(preferredModelName: storedConfiguration.localSenseVoiceModel) == .available
+        let hasModel = modelLocator.credentialStatus(
+            preferredModelName: storedConfiguration.localSenseVoiceModel
+        ) == .available
         let pythonURL = runtimeDirectory.appendingPathComponent("bin/python3")
         let runtimeMarkerURL = runtimeDirectory.appendingPathComponent(".runtime-ready")
         let hasRuntime =

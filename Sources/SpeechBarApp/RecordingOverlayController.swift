@@ -330,14 +330,17 @@ private struct WaveformBars: View {
                             endPoint: .top
                         )
                     )
-                    .frame(width: 2.2, height: max(4, CGFloat(sample.level) * 11))
+                    .frame(
+                        width: 2.6,
+                        height: max(6, CGFloat(sample.level) * 16 + CGFloat(sample.peak) * 6)
+                    )
             }
 
             if bars.isEmpty {
                 ForEach(0..<7, id: \.self) { _ in
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(Color.white.opacity(0.16))
-                        .frame(width: 2.2, height: 4)
+                        .frame(width: 2.6, height: 6)
                 }
             }
         }

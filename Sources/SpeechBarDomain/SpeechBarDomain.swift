@@ -346,6 +346,13 @@ public protocol TranscriptPublisher: Sendable {
     func publish(_ transcript: PublishedTranscript) async throws -> TranscriptDeliveryOutcome
 }
 
+public protocol StreamingTranscriptPublisher: Sendable {
+    func beginStreamingSession() async
+    func updateStreamingTranscript(_ text: String) async throws -> TranscriptDeliveryOutcome
+    func finishStreamingSession(finalText: String) async throws -> TranscriptDeliveryOutcome
+    func cancelStreamingSession() async
+}
+
 public protocol WindowSwitching: Sendable {
     func switchWindow(direction: WindowSwitchDirection) async -> WindowSwitchOutcome
 }

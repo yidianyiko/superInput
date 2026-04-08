@@ -21,3 +21,10 @@ xcuserdata/
 Docs/mac-background-app-mounting-summary.md
 
 Docs/current-mac-speech-cloud-api-summary.md
+
+*.zip
+*.app/
+mac_handoff_*/
+slashvibe_v1_firmware-codex-slashvibe-bringup-autopilot/
+
+*.md

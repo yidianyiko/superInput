@@ -136,7 +136,12 @@ public actor SenseVoiceTranscriptionClient: TranscriptionClient {
         let trimStartedAt = Date()
         let trimmedPCM = PCMInputTrimmer.trimMonoInt16PCM(
             audioBuffer,
-            sampleRate: configuration.sampleRate
+            sampleRate: configuration.sampleRate,
+            amplitudeThreshold: 28,
+            leadingPaddingMilliseconds: 720,
+            trailingPaddingMilliseconds: 240,
+            minimumLeadingRetainedMilliseconds: 600,
+            prependLeadingSilenceMilliseconds: 120
         )
         guard !trimmedPCM.data.isEmpty else {
             throw SenseVoiceTranscriptionClientError.emptyAudio

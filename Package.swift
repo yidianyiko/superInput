@@ -36,6 +36,9 @@ let package = Package(
                 "SpeechBarDomain",
                 "SpeechBarApplication",
                 "SpeechBarInfrastructure"
+            ],
+            resources: [
+                .copy("Resources/HardwareBridge")
             ]
         ),
         .testTarget(
