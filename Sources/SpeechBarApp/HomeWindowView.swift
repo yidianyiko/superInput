@@ -90,7 +90,7 @@ struct HomeWindowView: View {
             }
         }
         .background(store.palette.canvasTop)
-        .environment(\.colorScheme, .light)
+        .preferredColorScheme(store.palette.preferredColorScheme)
         .sheet(
             isPresented: Binding(
                 get: { localWhisperModelStore.shouldShowInstallPrompt },
@@ -132,6 +132,10 @@ struct HomeWindowView: View {
         )
     }
 
+    private var palette: HomeWindowStore.HomeThemePalette {
+        store.palette
+    }
+
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 10) {
@@ -164,18 +168,19 @@ struct HomeWindowView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("SlashVibe")
                             .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(palette.textPrimary)
                         Text("Voice input")
                             .font(.system(size: 11, weight: .semibold, design: .rounded))
                             .textCase(.uppercase)
                             .tracking(1.2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.textSecondary)
                     }
                 }
 
-                Text("自然说话，快速成文。")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            Text("自然说话，快速成文。")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             VStack(alignment: .leading, spacing: 7) {
@@ -197,7 +202,7 @@ struct HomeWindowView: View {
             HStack {
                 Text(store.currentVersionText)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                 Spacer()
                 Circle()
                     .fill(coordinator.credentialStatus == .available ? Color.green : Color.orange)
@@ -251,15 +256,16 @@ struct HomeWindowView: View {
                 HStack {
                     Text("订阅中心")
                         .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(palette.textPrimary)
                     Spacer()
                     Text("Web")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                 }
 
                 Text("购买或管理 SlashVibe Pro。")
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 HStack(spacing: 8) {
@@ -284,7 +290,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "首页",
                 title: "SlashVibe 控制台",
-                subtitle: "集中管理录音、转写、历史与订阅。"
+                subtitle: "集中管理录音、转写、历史与订阅。",
+                palette: palette
             )
 
             dashboardHero
@@ -298,6 +305,7 @@ struct HomeWindowView: View {
                 spacing: 16
             ) {
                 MetricCard(
+                    palette: palette,
                     title: "累计录音次数",
                     value: "\(store.totalSessionCount)",
                     detail: "总共完成的转写会话",
@@ -305,6 +313,7 @@ struct HomeWindowView: View {
                     tint: store.palette.accent
                 )
                 MetricCard(
+                    palette: palette,
                     title: "今日次数",
                     value: "\(store.todaySessionCount)",
                     detail: "今天已经触发的转写",
@@ -312,6 +321,7 @@ struct HomeWindowView: View {
                     tint: store.palette.highlight
                 )
                 MetricCard(
+                    palette: palette,
                     title: "口述字数",
                     value: "\(store.totalCharacterCount)",
                     detail: "已转写出的文本字符",
@@ -319,6 +329,7 @@ struct HomeWindowView: View {
                     tint: store.palette.accentSecondary
                 )
                 MetricCard(
+                    palette: palette,
                     title: "总口述时间",
                     value: "\(store.totalDictationMinutes) min",
                     detail: "累计口述时长",
@@ -326,6 +337,7 @@ struct HomeWindowView: View {
                     tint: store.palette.accent
                 )
                 MetricCard(
+                    palette: palette,
                     title: "节省时间",
                     value: "\(store.estimatedSavedMinutes) min",
                     detail: "按 30 字/分钟手动输入估算",
@@ -333,6 +345,7 @@ struct HomeWindowView: View {
                     tint: store.palette.highlight
                 )
                 MetricCard(
+                    palette: palette,
                     title: "平均口述速度",
                     value: "\(store.averageDictationCharactersPerMinute) 字/分钟",
                     detail: "按历史会话实时计算",
@@ -356,18 +369,18 @@ struct HomeWindowView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("SlashVibe")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.black.opacity(0.48))
+                        .foregroundStyle(palette.textMuted)
                         .textCase(.uppercase)
                         .tracking(1.6)
 
                     Text("让语音输入像系统功能一样自然")
                         .font(.system(size: 31, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+                        .foregroundStyle(palette.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text("按右侧 Command 开始或结束录音。转写、润色与写入整合为一个更安静的工作流。")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(Color.black.opacity(0.58))
+                        .foregroundStyle(palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -375,11 +388,12 @@ struct HomeWindowView: View {
 
                 VStack(alignment: .trailing, spacing: 14) {
                     SessionBadge(
+                        palette: palette,
                         title: store.currentStatusTitle,
                         tint: sessionTint
                     )
 
-                    ShortcutKeyCaps(symbols: ["⌘", "Press", "Talk"])
+                    ShortcutKeyCaps(palette: palette, symbols: ["⌘", "Press", "Talk"])
                 }
             }
 
@@ -397,17 +411,17 @@ struct HomeWindowView: View {
                 Button("打开辅助功能设置") {
                     AccessibilityPermissionManager.openSystemSettings()
                 }
-                .buttonStyle(SlashVibeHeroSecondaryButtonStyle())
+                .buttonStyle(SlashVibeHeroSecondaryButtonStyle(palette: palette))
             }
 
             HStack(spacing: 8) {
-                InlineTag(title: "写入方式", value: "当前聚焦输入框", symbol: "text.cursor", palette: store.palette, inHero: true)
-                InlineTag(title: "转写服务", value: modelSettingsStore.selectedSpeechProviderName, symbol: "bolt.horizontal.circle", palette: store.palette, inHero: true)
-                InlineTag(title: "模型语言", value: "\(modelSettingsStore.currentSpeechModel) / \(modelSettingsStore.currentSpeechLanguage)", symbol: "globe", palette: store.palette, inHero: true)
+                InlineTag(title: "写入方式", value: "当前聚焦输入框", symbol: "text.cursor", palette: palette, inHero: true)
+                InlineTag(title: "转写服务", value: modelSettingsStore.selectedSpeechProviderName, symbol: "bolt.horizontal.circle", palette: palette, inHero: true)
+                InlineTag(title: "模型语言", value: "\(modelSettingsStore.currentSpeechModel) / \(modelSettingsStore.currentSpeechLanguage)", symbol: "globe", palette: palette, inHero: true)
             }
         }
         .padding(20)
-        .slashVibeHeroSurface(palette: store.palette)
+        .slashVibeHeroSurface(palette: palette)
     }
 
     private var subscriptionBanner: some View {
@@ -416,9 +430,10 @@ struct HomeWindowView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("SlashVibe Pro")
                         .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(palette.textPrimary)
                     Text("解锁更高配额与团队协作能力。")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                 }
 
                 Spacer()
@@ -567,7 +582,8 @@ struct HomeWindowView: View {
                 if store.history.isEmpty {
                     EmptyStateCard(
                         title: "还没有历史记录",
-                        detail: "完成一次录音转写后，这里会自动新增一条记录，用于统计和回看。"
+                        detail: "完成一次录音转写后，这里会自动新增一条记录，用于统计和回看。",
+                        palette: palette
                     )
                 } else {
                     VStack(spacing: 12) {
@@ -585,8 +601,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "记忆",
                 title: "用户背景与表达偏好",
-                subtitle: "职业、术语与表达偏好会共同影响识别和润色。"
-                
+                subtitle: "职业、术语与表达偏好会共同影响识别和润色。",
+                palette: palette
             )
 
             GlassCard(palette: store.palette, padding: 22) {
@@ -625,12 +641,12 @@ struct HomeWindowView: View {
                     HStack(spacing: 12) {
                         Text(userProfileStore.terminologyStatusMessage)
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.textSecondary)
 
                         if let lastGeneratedAt = userProfileStore.lastGeneratedAt {
                             Text("最近更新：\(store.formattedDate(lastGeneratedAt))")
                                 .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(palette.textSecondary)
                         }
                     }
                 }
@@ -644,19 +660,20 @@ struct HomeWindowView: View {
                     )
 
                     PlaceholderTextEditor(
+                        palette: palette,
                         text: $userProfileStore.memoryProfile,
                         placeholder: "例如：我是 AI 创业者，常用中文交流但会夹杂英文产品术语。我偏好结论先行、结构清晰、适合直接发送给同事或 AI 助手的表达。"
                     )
                     .frame(minHeight: 300)
 
                     HStack(spacing: 10) {
-                        SuggestionChip(title: "职业背景") {
+                        SuggestionChip(palette: palette, title: "职业背景") {
                             userProfileStore.addMemoryTemplate("我是创业者，平时会围绕 AI 产品、增长、融资和团队协作做高频沟通。")
                         }
-                        SuggestionChip(title: "表达风格") {
+                        SuggestionChip(palette: palette, title: "表达风格") {
                             userProfileStore.addMemoryTemplate("我希望输出更自然、有段落感，尽量避免机械口语和重复表达。")
                         }
-                        SuggestionChip(title: "术语偏好") {
+                        SuggestionChip(palette: palette, title: "术语偏好") {
                             userProfileStore.addMemoryTemplate("请保留常见英文产品词汇、技术术语和模型名称，不要强行翻译。")
                         }
                     }
@@ -665,9 +682,10 @@ struct HomeWindowView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("AI 后处理润色")
                                 .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(palette.textPrimary)
                             Text("录音结束后，使用 OpenAI 对原始转写做纠错和表达整理。")
                                 .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(palette.textSecondary)
                         }
                     }
                     .toggleStyle(.switch)
@@ -682,7 +700,7 @@ struct HomeWindowView: View {
 
                         Text(polishModeDescription)
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
 
                         Divider()
 
@@ -694,7 +712,7 @@ struct HomeWindowView: View {
                                 HStack {
                                     Text("短句阈值")
                                         .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundStyle(palette.textSecondary)
                                     Spacer()
                                     Picker("短句阈值", selection: $userProfileStore.shortPolishCharacterThreshold) {
                                         ForEach(polishCharacterThresholdOptions, id: \.self) { value in
@@ -728,12 +746,12 @@ struct HomeWindowView: View {
 
                             Text("提速逻辑会优先跳过短句，并且只在你启用时才读取前台应用或剪贴板上下文。")
                                 .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(palette.textSecondary)
                         }
                     } else {
                         Text("关闭后将直接使用原始转写结果；重新开启时会恢复你上次使用的润色模式。")
                             .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.textSecondary)
                     }
                 }
             }
@@ -753,7 +771,7 @@ struct HomeWindowView: View {
 
                     Text("记忆仅保存在本机，敏感输入会被排除或脱敏处理。")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                 }
             }
 
@@ -785,7 +803,8 @@ struct HomeWindowView: View {
                     if userProfileStore.terminologyGlossary.isEmpty {
                         EmptyStateCard(
                             title: "还没有术语词表",
-                            detail: "先填写职业并生成术语，或手动添加词条。"
+                            detail: "先填写职业并生成术语，或手动添加词条。",
+                            palette: palette
                         )
                     } else {
                         ScrollView {
@@ -832,7 +851,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "监控",
                 title: "多 Agent 任务看板",
-                subtitle: "查看任务卡、provider 摘要和设备链路状态。"
+                subtitle: "查看任务卡、provider 摘要和设备链路状态。",
+                palette: palette
             )
 
             GlassCard(palette: store.palette, padding: 22) {
@@ -844,6 +864,7 @@ struct HomeWindowView: View {
 
                     HStack(spacing: 12) {
                         MetricCard(
+                            palette: palette,
                             title: "活跃任务",
                             value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.count)",
                             detail: "当前可见卡片",
@@ -851,6 +872,7 @@ struct HomeWindowView: View {
                             tint: store.palette.accent
                         )
                         MetricCard(
+                            palette: palette,
                             title: "隐藏任务",
                             value: "\(agentMonitorCoordinator.taskBoardSnapshot.hiddenCount)",
                             detail: "超出 5 张后的数量",
@@ -858,6 +880,7 @@ struct HomeWindowView: View {
                             tint: store.palette.highlight
                         )
                         MetricCard(
+                            palette: palette,
                             title: "传输状态",
                             value: transportStatusTitle,
                             detail: embeddedDisplayCoordinator.connectionState.reason ?? "链路正常",
@@ -904,7 +927,8 @@ struct HomeWindowView: View {
                     if agentMonitorCoordinator.taskBoardSnapshot.cards.isEmpty {
                         EmptyStateCard(
                             title: "还没有采集到任务",
-                            detail: "Codex 会优先从 JSONL 会话目录读取，Claude/Gemini/Cursor 会等待 hook inbox 事件落盘。"
+                            detail: "Codex 会优先从 JSONL 会话目录读取，Claude/Gemini/Cursor 会等待 hook inbox 事件落盘。",
+                            palette: palette
                         )
                     } else {
                         VStack(spacing: 12) {
@@ -934,7 +958,7 @@ struct HomeWindowView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(card.isSelected ? store.palette.softFill.opacity(0.95) : Color.white.opacity(0.82))
+                                        .fill(card.isSelected ? store.palette.softFill.opacity(0.95) : store.palette.controlFill)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1001,7 +1025,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "调试",
                 title: "诊断与回放",
-                subtitle: "查看 collector 健康、诊断事件与回放包。"
+                subtitle: "查看 collector 健康、诊断事件与回放包。",
+                palette: palette
             )
 
             HStack(alignment: .top, spacing: 18) {
@@ -1064,7 +1089,8 @@ struct HomeWindowView: View {
                     if diagnosticsCoordinator.recentDiagnostics.isEmpty {
                         EmptyStateCard(
                             title: "还没有诊断事件",
-                            detail: "启动后 collector、快照构建和 transport 发送都会自动写入诊断日志。"
+                            detail: "启动后 collector、快照构建和 transport 发送都会自动写入诊断日志。",
+                            palette: palette
                         )
                     } else {
                         ForEach(diagnosticsCoordinator.recentDiagnostics.prefix(12)) { event in
@@ -1102,7 +1128,8 @@ struct HomeWindowView: View {
                     if diagnosticsCoordinator.recentBundles.isEmpty {
                         EmptyStateCard(
                             title: "还没有回放包",
-                            detail: "当出现发送失败、严重诊断事件时，这里会记录 bundle 路径。"
+                            detail: "当出现发送失败、严重诊断事件时，这里会记录 bundle 路径。",
+                            palette: palette
                         )
                     } else {
                         ForEach(diagnosticsCoordinator.recentBundles.prefix(8)) { bundle in
@@ -1131,6 +1158,7 @@ struct HomeWindowView: View {
                     )
 
                     PlaceholderTextEditor(
+                        palette: palette,
                         text: $polishPlaygroundStore.inputText,
                         placeholder: "粘贴一段待润色的原始文本，例如一段口语化、重复较多的转写结果。"
                     )
@@ -1233,7 +1261,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "模型",
                 title: "接口与模型配置",
-                subtitle: "可在 Deepgram、Whisper API、本地 Whisper 与本地 SenseVoice 间切换。"
+                subtitle: "可在 Deepgram、Whisper API、本地 Whisper 与本地 SenseVoice 间切换。",
+                palette: palette
             )
 
             HStack(alignment: .top, spacing: 18) {
@@ -1531,7 +1560,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "设置",
                 title: "设置与音频输入",
-                subtitle: "集中管理主题、系统状态和录音设备。"
+                subtitle: "集中管理主题、系统状态和录音设备。",
+                palette: palette
             )
 
             GlassCard(palette: store.palette, padding: 22) {
@@ -1568,7 +1598,8 @@ struct HomeWindowView: View {
                         if audioInputSettingsStore.availableDevices.isEmpty {
                             EmptyStateCard(
                                 title: "还没有检测到可用麦克风",
-                                detail: "点击“刷新设备”重新扫描，或先在 macOS 中连接输入设备。"
+                                detail: "点击“刷新设备”重新扫描，或先在 macOS 中连接输入设备。",
+                                palette: palette
                             )
                         } else {
                             ForEach(audioInputSettingsStore.availableDevices) { device in
@@ -1702,14 +1733,14 @@ struct HomeWindowView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
 
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.9))
+                .fill(palette.elevatedFill)
                 .overlay(alignment: .topLeading) {
                     Text(text.isEmpty ? placeholder : text)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(text.isEmpty ? .secondary : .primary)
+                        .foregroundStyle(text.isEmpty ? palette.textSecondary : palette.textPrimary)
                         .padding(12)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .multilineTextAlignment(.leading)
@@ -1726,7 +1757,7 @@ struct HomeWindowView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
 
             if editable {
                 TextField(title, text: text)
@@ -1797,7 +1828,8 @@ private struct MonitorPageContent: View {
             PageTitle(
                 eyebrow: "监控",
                 title: "多 Agent 任务看板",
-                subtitle: "查看任务卡、provider 摘要和设备链路状态。"
+                subtitle: "查看任务卡、provider 摘要和设备链路状态。",
+                palette: palette
             )
 
             GlassCard(palette: palette, padding: 22) {
@@ -1809,6 +1841,7 @@ private struct MonitorPageContent: View {
 
                     HStack(spacing: 12) {
                         MetricCard(
+                            palette: palette,
                             title: "活跃任务",
                             value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.count)",
                             detail: "当前可见卡片",
@@ -1816,6 +1849,7 @@ private struct MonitorPageContent: View {
                             tint: palette.accent
                         )
                         MetricCard(
+                            palette: palette,
                             title: "隐藏任务",
                             value: "\(agentMonitorCoordinator.taskBoardSnapshot.hiddenCount)",
                             detail: "超出 5 张后的数量",
@@ -1823,6 +1857,7 @@ private struct MonitorPageContent: View {
                             tint: palette.highlight
                         )
                         MetricCard(
+                            palette: palette,
                             title: "传输状态",
                             value: transportStatusTitle,
                             detail: embeddedDisplayCoordinator.connectionState.reason ?? "链路正常",
@@ -1869,7 +1904,8 @@ private struct MonitorPageContent: View {
                     if agentMonitorCoordinator.taskBoardSnapshot.cards.isEmpty {
                         EmptyStateCard(
                             title: "还没有采集到任务",
-                            detail: "Codex 会优先从 JSONL 会话目录读取，Claude/Gemini/Cursor 会等待 hook inbox 事件落盘。"
+                            detail: "Codex 会优先从 JSONL 会话目录读取，Claude/Gemini/Cursor 会等待 hook inbox 事件落盘。",
+                            palette: palette
                         )
                     } else {
                         VStack(spacing: 12) {
@@ -1899,7 +1935,7 @@ private struct MonitorPageContent: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(card.isSelected ? palette.softFill.opacity(0.95) : Color.white.opacity(0.82))
+                                        .fill(card.isSelected ? palette.softFill.opacity(0.95) : palette.controlFill)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -1999,7 +2035,7 @@ private struct MonitorPageContent: View {
                 .font(.system(size: 17, weight: .semibold))
             Text(subtitle)
                 .font(.system(size: 11))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -2018,7 +2054,8 @@ private struct DebugPageContent: View {
             PageTitle(
                 eyebrow: "调试",
                 title: "诊断与回放",
-                subtitle: "查看 collector 健康、诊断事件与回放包。"
+                subtitle: "查看 collector 健康、诊断事件与回放包。",
+                palette: palette
             )
 
             HStack(alignment: .top, spacing: 18) {
@@ -2081,7 +2118,8 @@ private struct DebugPageContent: View {
                     if diagnosticsCoordinator.recentDiagnostics.isEmpty {
                         EmptyStateCard(
                             title: "还没有诊断事件",
-                            detail: "启动后 collector、快照构建和 transport 发送都会自动写入诊断日志。"
+                            detail: "启动后 collector、快照构建和 transport 发送都会自动写入诊断日志。",
+                            palette: palette
                         )
                     } else {
                         ForEach(diagnosticsCoordinator.recentDiagnostics.prefix(12)) { event in
@@ -2119,7 +2157,8 @@ private struct DebugPageContent: View {
                     if diagnosticsCoordinator.recentBundles.isEmpty {
                         EmptyStateCard(
                             title: "还没有回放包",
-                            detail: "当出现发送失败、严重诊断事件时，这里会记录 bundle 路径。"
+                            detail: "当出现发送失败、严重诊断事件时，这里会记录 bundle 路径。",
+                            palette: palette
                         )
                     } else {
                         ForEach(diagnosticsCoordinator.recentBundles.prefix(8)) { bundle in
@@ -2148,6 +2187,7 @@ private struct DebugPageContent: View {
                     )
 
                     PlaceholderTextEditor(
+                        palette: palette,
                         text: $polishPlaygroundStore.inputText,
                         placeholder: "粘贴一段待润色的原始文本，例如一段口语化、重复较多的转写结果。"
                     )
@@ -2221,14 +2261,14 @@ private struct DebugPageContent: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
 
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.9))
+                .fill(palette.elevatedFill)
                 .overlay(alignment: .topLeading) {
                     Text(text.isEmpty ? placeholder : text)
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(text.isEmpty ? .secondary : .primary)
+                        .foregroundStyle(text.isEmpty ? palette.textSecondary : palette.textPrimary)
                         .padding(12)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .multilineTextAlignment(.leading)
@@ -2254,21 +2294,21 @@ private struct AudioInputOptionRow: View {
             HStack(spacing: 14) {
                 ZStack {
                     Circle()
-                        .fill(isSelected ? palette.accent.opacity(0.16) : Color.white.opacity(0.72))
+                        .fill(isSelected ? palette.accent.opacity(0.16) : palette.elevatedFill)
                         .frame(width: 34, height: 34)
 
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "mic.fill")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isSelected ? palette.accent : .secondary)
+                        .foregroundStyle(isSelected ? palette.accent : palette.textSecondary)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(palette.textPrimary)
                     Text(subtitle)
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -2288,7 +2328,7 @@ private struct AudioInputOptionRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(isSelected ? Color.white.opacity(0.95) : Color.white.opacity(0.78))
+                    .fill(isSelected ? palette.elevatedFill : palette.controlFill)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -2312,15 +2352,16 @@ private struct SidebarTabButton: View {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isSelected ? palette.accent : .secondary)
+                    .foregroundStyle(isSelected ? palette.accent : palette.textSecondary)
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(palette.textPrimary)
                     Text(subtitle)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                 }
 
                 Spacer()
@@ -2329,7 +2370,7 @@ private struct SidebarTabButton: View {
             .padding(.vertical, 9)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.white.opacity(0.90) : Color.clear)
+                    .fill(isSelected ? palette.controlFill : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -2348,13 +2389,14 @@ private struct SidebarInfoCard: View {
     let value: String
     let detail: String
     let tint: Color
+    let palette: HomeWindowStore.HomeThemePalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                 Spacer()
                 Circle()
                     .fill(tint)
@@ -2363,17 +2405,18 @@ private struct SidebarInfoCard: View {
 
             Text(value)
                 .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(palette.textPrimary)
 
             Text(detail)
                 .font(.system(size: 12))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
-        .background(Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(palette.elevatedFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.9), lineWidth: 1)
+                .stroke(palette.controlStroke, lineWidth: 1)
         )
     }
 }
@@ -2382,21 +2425,22 @@ private struct PageTitle: View {
     let eyebrow: String
     let title: String
     let subtitle: String
+    let palette: HomeWindowStore.HomeThemePalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(eyebrow.uppercased())
                 .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Color.white.opacity(0.66), in: Capsule())
+                .background(palette.controlFill, in: Capsule())
             Text(title)
                 .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+                .foregroundStyle(palette.textPrimary)
             Text(subtitle)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -2415,6 +2459,7 @@ private struct GlassCard<Content: View>: View {
 }
 
 private struct MetricCard: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let title: String
     let value: String
     let detail: String
@@ -2441,35 +2486,25 @@ private struct MetricCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                 Text(value)
                     .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(palette.textPrimary)
                 Text(detail)
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 0)
         }
         .padding(16)
-        .slashVibeSurface(palette: .init(
-            accent: tint,
-            accentSecondary: tint.opacity(0.7),
-            highlight: tint,
-            sidebarTop: .white,
-            sidebarBottom: .white,
-            canvasTop: .white,
-            canvasBottom: .white,
-            cardTop: .white,
-            cardBottom: .white,
-            border: tint.opacity(0.20),
-            softFill: tint.opacity(0.10)
-        ), cornerRadius: 20, accent: tint)
+        .slashVibeSurface(palette: palette, cornerRadius: 20, accent: tint)
     }
 }
 
 private struct SessionBadge: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let title: String
     let tint: Color
 
@@ -2483,8 +2518,8 @@ private struct SessionBadge: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+        .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .foregroundStyle(palette.controlText)
     }
 }
 
@@ -2499,26 +2534,26 @@ private struct InlineTag: View {
         HStack(spacing: 8) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(inHero ? palette.accent : palette.accent)
+                .foregroundStyle(palette.accent)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(inHero ? Color.black.opacity(0.46) : .secondary)
+                    .foregroundStyle(inHero ? palette.textSecondary : palette.textSecondary)
                 Text(value)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(inHero ? Color(red: 0.11, green: 0.11, blue: 0.12) : .primary)
+                    .foregroundStyle(inHero ? palette.textPrimary : palette.textPrimary)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(inHero ? Color.white.opacity(0.76) : Color.white.opacity(0.88))
+                .fill(inHero ? palette.elevatedFill : palette.controlFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(inHero ? Color.black.opacity(0.08) : Color.clear, lineWidth: 1)
+                .stroke(inHero ? palette.controlStroke : Color.clear, lineWidth: 1)
         )
     }
 }
@@ -2548,17 +2583,18 @@ private struct CompactSummary: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
             Text(value)
                 .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(palette.textPrimary)
                 .lineLimit(2)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.softFill.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(palette.elevatedFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.48), lineWidth: 1)
+                .stroke(palette.controlStroke, lineWidth: 1)
         )
     }
 }
@@ -2616,35 +2652,26 @@ private struct HistoryRow: View {
 private struct EmptyStateCard: View {
     let title: String
     let detail: String
+    let palette: HomeWindowStore.HomeThemePalette
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(palette.textPrimary)
             Text(detail)
                 .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .slashVibeSurface(palette: .init(
-            accent: .gray,
-            accentSecondary: .gray,
-            highlight: .gray,
-            sidebarTop: .white,
-            sidebarBottom: .white,
-            canvasTop: .white,
-            canvasBottom: .white,
-            cardTop: Color.white.opacity(0.96),
-            cardBottom: Color.white.opacity(0.92),
-            border: Color.black.opacity(0.06),
-            softFill: Color.black.opacity(0.03)
-        ), cornerRadius: 18)
+        .slashVibeSurface(palette: palette, cornerRadius: 18)
     }
 }
 
 private struct SuggestionChip: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let title: String
     let action: () -> Void
 
@@ -2654,15 +2681,17 @@ private struct SuggestionChip: View {
             .font(.system(size: 12, weight: .medium))
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.white.opacity(0.82), in: Capsule())
+            .background(palette.controlFill, in: Capsule())
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.58), lineWidth: 1)
+                    .stroke(palette.controlStroke, lineWidth: 1)
             )
+            .foregroundStyle(palette.controlText)
     }
 }
 
 private struct PlaceholderTextEditor: View {
+    let palette: HomeWindowStore.HomeThemePalette
     @Binding var text: String
     let placeholder: String
 
@@ -2673,27 +2702,12 @@ private struct PlaceholderTextEditor: View {
                 .scrollContentBackground(.hidden)
                 .padding(10)
                 .background(Color.clear)
-                .slashVibeSurface(
-                    palette: .init(
-                        accent: .gray,
-                        accentSecondary: .gray,
-                        highlight: .gray,
-                        sidebarTop: .white,
-                        sidebarBottom: .white,
-                        canvasTop: .white,
-                        canvasBottom: .white,
-                        cardTop: Color.white.opacity(0.98),
-                        cardBottom: Color.white.opacity(0.92),
-                        border: Color.black.opacity(0.06),
-                        softFill: Color.black.opacity(0.03)
-                    ),
-                    cornerRadius: 18
-                )
+                .slashVibeSurface(palette: palette, cornerRadius: 18)
 
             if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text(placeholder)
                     .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 18)
             }
@@ -2730,10 +2744,11 @@ private struct ThemePresetCard: View {
 
                 Text(theme.title)
                     .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(palette.textPrimary)
 
                 Text(theme.subtitle)
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
@@ -2757,6 +2772,7 @@ private struct ThemePresetCard: View {
 }
 
 private struct ShortcutKeyCaps: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let symbols: [String]
 
     var body: some View {
@@ -2764,13 +2780,13 @@ private struct ShortcutKeyCaps: View {
             ForEach(symbols, id: \.self) { symbol in
                 Text(symbol)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+                    .foregroundStyle(palette.controlText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            .stroke(palette.controlStroke, lineWidth: 1)
                     )
             }
         }
@@ -2820,15 +2836,12 @@ private struct SecondaryPanelButtonStyle: ButtonStyle {
             .font(.system(size: 13, weight: .semibold))
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.white.opacity(0.92))
-            )
+            .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(palette.border.opacity(0.78), lineWidth: 1)
+                    .stroke(palette.controlStroke, lineWidth: 1)
             )
-            .foregroundStyle(.primary)
+            .foregroundStyle(palette.controlText)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
         }
     }

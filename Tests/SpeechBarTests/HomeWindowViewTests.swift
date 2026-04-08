@@ -84,6 +84,38 @@ struct HomeWindowViewTests {
 
         #expect(bodyEvaluationCount == baselineCount)
     }
+
+    @Test
+    @MainActor
+    func greenDefaultThemeRendersDarkHomeSurface() {
+        let dependencies = makeHomeWindowDependencies()
+        dependencies.store.saveSelectedSection(.home)
+
+        let view = HomeWindowView(
+            coordinator: dependencies.coordinator,
+            agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
+            embeddedDisplayCoordinator: dependencies.embeddedDisplayCoordinator,
+            diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
+            store: dependencies.store,
+            userProfileStore: dependencies.userProfileStore,
+            audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            modelSettingsStore: dependencies.modelSettingsStore,
+            polishPlaygroundStore: dependencies.polishPlaygroundStore,
+            localWhisperModelStore: dependencies.localWhisperModelStore,
+            senseVoiceModelStore: dependencies.senseVoiceModelStore,
+            memoryConstellationStore: dependencies.memoryConstellationStore,
+            memoryFeatureFlagStore: dependencies.memoryFeatureFlagStore,
+            pushToTalkSource: dependencies.pushToTalkSource
+        )
+
+        let image = renderedBitmap(
+            for: view.frame(width: 1240, height: 780),
+            size: CGSize(width: 1240, height: 780)
+        )
+
+        assertDarkPixel(image, x: 40, y: 40)
+        assertDarkPixel(image, x: 1080, y: 150)
+    }
 }
 
 @MainActor
@@ -155,6 +187,34 @@ private func makeHomeWindowDependencies() -> HomeWindowViewTestDependencies {
         memoryFeatureFlagStore: memoryFeatureFlagStore,
         pushToTalkSource: pushToTalkSource
     )
+}
+
+@MainActor
+private func renderedBitmap<V: View>(for view: V, size: CGSize) -> NSBitmapImageRep {
+    let hostingView = NSHostingView(rootView: view)
+    hostingView.frame = CGRect(origin: .zero, size: size)
+    hostingView.layoutSubtreeIfNeeded()
+
+    let bitmap = hostingView.bitmapImageRepForCachingDisplay(in: hostingView.bounds)!
+    hostingView.cacheDisplay(in: hostingView.bounds, to: bitmap)
+    return bitmap
+}
+
+private func assertDarkPixel(
+    _ bitmap: NSBitmapImageRep,
+    x: Int,
+    y: Int,
+    maxBrightness: Double = 0.45,
+    sourceLocation: SourceLocation = #_sourceLocation
+) {
+    let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB)
+    #expect(color != nil, sourceLocation: sourceLocation)
+    guard let color else {
+        return
+    }
+
+    let brightness = (Double(color.redComponent) + Double(color.greenComponent) + Double(color.blueComponent)) / 3.0
+    #expect(brightness < maxBrightness, sourceLocation: sourceLocation)
 }
 
 @MainActor

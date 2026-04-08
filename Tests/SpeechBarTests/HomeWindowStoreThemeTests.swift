@@ -50,6 +50,20 @@ struct HomeWindowStoreThemeTests {
 
     @Test
     @MainActor
+    func unknownStoredThemeRawAtCurrentVersionIsNotClobberedOnInit() {
+        let defaults = makeDefaults()
+        defaults.set("mystery-theme", forKey: "home.selectedTheme")
+        defaults.set(3, forKey: "home.themeStyleVersion")
+
+        let store = makeStore(defaults: defaults)
+
+        #expect(store.selectedTheme == .green)
+        #expect(defaults.string(forKey: "home.selectedTheme") == "mystery-theme")
+        #expect(defaults.integer(forKey: "home.themeStyleVersion") == 3)
+    }
+
+    @Test
+    @MainActor
     func greenPresetPaletteUsesDarkBrandRoles() {
         let palette = HomeWindowStore.ThemePreset.green.palette
 
