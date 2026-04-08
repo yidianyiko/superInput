@@ -16,6 +16,7 @@ struct HomeWindowView: View {
     @ObservedObject var modelSettingsStore: OpenAIModelSettingsStore
     @ObservedObject var localWhisperModelStore: LocalWhisperModelStore
     @ObservedObject var senseVoiceModelStore: SenseVoiceModelStore
+    @ObservedObject var memoryConstellationStore: MemoryConstellationStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
     let pushToTalkSource: OnScreenPushToTalkSource
 
@@ -178,7 +179,11 @@ struct HomeWindowView: View {
         case .home:
             homePage
         case .memory:
-            memoryPage
+            MemoryConstellationScreen(
+                constellationStore: memoryConstellationStore,
+                userProfileStore: userProfileStore,
+                memoryFeatureFlagStore: memoryFeatureFlagStore
+            )
         case .model:
             modelPage
         case .monitor:
