@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class HomeWindowController: NSWindowController, NSWindowDelegate {
     private let store: HomeWindowStore
+    private let memoryConstellationStore: MemoryConstellationStore
     private let agentMonitorCoordinator: AgentMonitorCoordinator
     private let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
     private let diagnosticsCoordinator: DiagnosticsCoordinator
@@ -27,9 +28,11 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         modelSettingsStore: OpenAIModelSettingsStore,
         localWhisperModelStore: LocalWhisperModelStore,
         senseVoiceModelStore: SenseVoiceModelStore,
+        memoryConstellationStore: MemoryConstellationStore,
         memoryFeatureFlagStore: MemoryFeatureFlagStore
     ) {
         self.store = HomeWindowStore(coordinator: coordinator)
+        self.memoryConstellationStore = memoryConstellationStore
         self.agentMonitorCoordinator = agentMonitorCoordinator
         self.embeddedDisplayCoordinator = embeddedDisplayCoordinator
         self.diagnosticsCoordinator = diagnosticsCoordinator
@@ -51,6 +54,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
                 modelSettingsStore: modelSettingsStore,
                 localWhisperModelStore: localWhisperModelStore,
                 senseVoiceModelStore: senseVoiceModelStore,
+                memoryConstellationStore: memoryConstellationStore,
                 memoryFeatureFlagStore: memoryFeatureFlagStore,
                 pushToTalkSource: pushToTalkSource
             )

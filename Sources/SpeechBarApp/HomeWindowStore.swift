@@ -38,7 +38,7 @@ final class HomeWindowStore: ObservableObject {
             case .home:
                 return "统计与记录"
             case .memory:
-                return "用户背景"
+                return "关系星图"
             case .model:
                 return "接口配置"
             case .monitor:

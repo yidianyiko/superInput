@@ -121,6 +121,7 @@ enum OffscreenHomeSnapshotRenderer {
             modelSettingsStore: environment.modelSettingsStore,
             localWhisperModelStore: environment.localWhisperModelStore,
             senseVoiceModelStore: environment.senseVoiceModelStore,
+            memoryConstellationStore: environment.memoryConstellationStore,
             memoryFeatureFlagStore: environment.memoryFeatureFlagStore,
             pushToTalkSource: environment.pushToTalkSource
         )

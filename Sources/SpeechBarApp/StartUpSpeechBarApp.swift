@@ -61,6 +61,7 @@ private struct AppDependencies {
     let senseVoiceModelStore: SenseVoiceModelStore
     let windowSwitchOverlayStore: WindowSwitchOverlayStore
     let memoryFeatureFlagStore: MemoryFeatureFlagStore
+    let memoryConstellationStore: MemoryConstellationStore
     let coordinator: VoiceSessionCoordinator
     let diagnosticsCoordinator: DiagnosticsCoordinator
     let agentMonitorCoordinator: AgentMonitorCoordinator
@@ -173,6 +174,10 @@ private struct AppDependencies {
             )
             memoryCoordinator = nil
         }
+        let memoryConstellationStore = MemoryConstellationStore(
+            catalog: memoryCoordinator,
+            featureFlags: memoryFeatureFlagStore
+        )
         let registry = DefaultAgentRegistry()
         let collectors = registry.makeEnabledCollectors()
         let reducer = DefaultAgentStateReducer(
@@ -194,6 +199,7 @@ private struct AppDependencies {
         self.senseVoiceModelStore = senseVoiceModelStore
         self.windowSwitchOverlayStore = windowSwitchOverlayStore
         self.memoryFeatureFlagStore = memoryFeatureFlagStore
+        self.memoryConstellationStore = memoryConstellationStore
         let coordinator = VoiceSessionCoordinator(
             hardwareSource: hardwareSource,
             audioInputSource: audioInputSource,
@@ -259,6 +265,7 @@ private struct AppDependencies {
             modelSettingsStore: modelSettingsStore,
             localWhisperModelStore: localWhisperModelStore,
             senseVoiceModelStore: senseVoiceModelStore,
+            memoryConstellationStore: memoryConstellationStore,
             memoryFeatureFlagStore: memoryFeatureFlagStore
         )
         self.recordingOverlayController = RecordingOverlayController(coordinator: coordinator)
