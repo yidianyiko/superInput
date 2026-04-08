@@ -35,19 +35,14 @@ struct StatusPanelViewThemeTests {
 
     @Test
     @MainActor
-    func greenDefaultThemeRendersDarkStatusSurface() {
-        let defaults = UserDefaults.standard
-        let previousTheme = defaults.string(forKey: "home.selectedTheme")
-        defaults.set(HomeWindowStore.ThemePreset.green.rawValue, forKey: "home.selectedTheme")
-        defer {
-            if let previousTheme {
-                defaults.set(previousTheme, forKey: "home.selectedTheme")
-            } else {
-                defaults.removeObject(forKey: "home.selectedTheme")
-            }
-        }
+    func startupMigrationSeedsLegacyAppleInstallBeforeStatusPanelReadsDefaults() {
+        let defaults = makeDefaults()
+        defaults.set(HomeWindowStore.ThemePreset.apple.rawValue, forKey: "home.selectedTheme")
+        defaults.set(2, forKey: "home.themeStyleVersion")
 
-        let dependencies = makeStatusPanelDependencies()
+        HomeWindowStore.migrateThemeStorageIfNeeded(defaults: defaults)
+
+        let dependencies = makeStatusPanelDependencies(defaults: defaults)
         let view = StatusPanelView(
             coordinator: dependencies.coordinator,
             agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
@@ -61,20 +56,22 @@ struct StatusPanelViewThemeTests {
             pushToTalkSource: dependencies.pushToTalkSource,
             openHomeAction: nil
         )
+        .defaultAppStorage(defaults)
 
         let bitmap = renderedBitmap(
             for: view.frame(width: 420, height: 560),
             size: CGSize(width: 420, height: 560)
         )
 
+        #expect(defaults.string(forKey: "home.selectedTheme") == HomeWindowStore.ThemePreset.green.rawValue)
+        #expect(defaults.integer(forKey: "home.themeStyleVersion") == 3)
         assertDarkPixel(bitmap, x: 300, y: 40)
         assertDarkPixel(bitmap, x: 300, y: 260)
     }
 }
 
 @MainActor
-private func makeStatusPanelDependencies() -> StatusPanelViewTestDependencies {
-    let defaults = UserDefaults(suiteName: "StatusPanelViewThemeTests.\(UUID().uuidString)")!
+private func makeStatusPanelDependencies(defaults: UserDefaults) -> StatusPanelViewTestDependencies {
     let diagnosticsDirectory = FileManager.default.temporaryDirectory
         .appendingPathComponent("StatusPanelViewThemeTests-\(UUID().uuidString)", isDirectory: true)
     let hardware = MockHardwareEventSource()
@@ -130,6 +127,14 @@ private func makeStatusPanelDependencies() -> StatusPanelViewTestDependencies {
         senseVoiceModelStore: senseVoiceModelStore,
         pushToTalkSource: pushToTalkSource
     )
+}
+
+@MainActor
+private func makeDefaults() -> UserDefaults {
+    let suiteName = "StatusPanelViewThemeTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+    return defaults
 }
 
 @MainActor

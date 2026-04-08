@@ -50,6 +50,19 @@ struct HomeWindowStoreThemeTests {
 
     @Test
     @MainActor
+    func sharedMigrationHelperSeedsLegacyAppleInstallBeforeHomeWindowStoreInit() {
+        let defaults = makeDefaults()
+        defaults.set(HomeWindowStore.ThemePreset.apple.rawValue, forKey: "home.selectedTheme")
+        defaults.set(2, forKey: "home.themeStyleVersion")
+
+        HomeWindowStore.migrateThemeStorageIfNeeded(defaults: defaults)
+
+        #expect(defaults.string(forKey: "home.selectedTheme") == HomeWindowStore.ThemePreset.green.rawValue)
+        #expect(defaults.integer(forKey: "home.themeStyleVersion") == 3)
+    }
+
+    @Test
+    @MainActor
     func unknownStoredThemeRawAtCurrentVersionIsNotClobberedOnInit() {
         let defaults = makeDefaults()
         defaults.set("mystery-theme", forKey: "home.selectedTheme")

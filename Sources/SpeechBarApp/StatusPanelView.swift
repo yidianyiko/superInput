@@ -67,6 +67,7 @@ struct StatusPanelView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
+        .preferredColorScheme(palette.preferredColorScheme)
     }
 
     private var headerCard: some View {

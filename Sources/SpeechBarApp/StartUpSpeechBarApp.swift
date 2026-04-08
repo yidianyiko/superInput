@@ -116,6 +116,7 @@ private struct AppDependencies {
             localWhisperModelsDirectory: localWhisperModelStore.modelsDirectory,
             defaultLocalWhisperModelName: localWhisperModelStore.defaultModel.name
         )
+        HomeWindowStore.migrateThemeStorageIfNeeded(defaults: .standard)
         let localSenseVoiceCredentialProvider = LocalSenseVoiceModelCredentialProvider(
             localSenseVoiceModelsDirectory: senseVoiceModelStore.modelsDirectory,
             defaultLocalSenseVoiceModelName: senseVoiceModelStore.defaultModel.name,

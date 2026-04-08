@@ -350,13 +350,8 @@ final class HomeWindowStore: ObservableObject {
         self.defaults = defaults
         self.selectedSection = Self.loadSection(from: defaults)
         self.memoryProfile = Self.loadString(forKey: Keys.memoryProfile, from: defaults)
-        let storedThemeRawValue = defaults.string(forKey: Keys.selectedTheme)
-        let storedThemeStyleVersion = defaults.integer(forKey: Keys.themeStyleVersion)
-        let loadedTheme = Self.loadTheme(from: defaults)
-        let shouldMigrateLegacyTheme = storedThemeStyleVersion < Self.currentThemeStyleVersion
-        let shouldMigrateLegacyAppleDefault = shouldMigrateLegacyTheme && loadedTheme == .apple
-        let shouldSeedFreshInstall = storedThemeRawValue == nil
-        self.selectedTheme = shouldMigrateLegacyAppleDefault ? .green : loadedTheme
+        Self.migrateThemeStorageIfNeeded(defaults: defaults)
+        self.selectedTheme = Self.loadTheme(from: defaults)
         self.modelConfiguration = Self.loadModelConfiguration(from: defaults)
         self.subscriptionPurchaseURL = Self.loadString(
             forKey: Keys.subscriptionPurchaseURL,
@@ -369,15 +364,6 @@ final class HomeWindowStore: ObservableObject {
             fallback: "https://your-domain.com/account/billing"
         )
         self.history = Self.loadHistory(from: defaults)
-        if shouldMigrateLegacyAppleDefault {
-            defaults.set(self.selectedTheme.rawValue, forKey: Keys.selectedTheme)
-            defaults.set(Self.currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
-        } else if shouldSeedFreshInstall {
-            defaults.set(self.selectedTheme.rawValue, forKey: Keys.selectedTheme)
-            defaults.set(Self.currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
-        } else if shouldMigrateLegacyTheme {
-            defaults.set(Self.currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
-        }
         bindPersistence()
         bindCoordinator()
     }
@@ -617,6 +603,25 @@ final class HomeWindowStore: ObservableObject {
             return .green
         }
         return theme
+    }
+
+    static func migrateThemeStorageIfNeeded(defaults: UserDefaults) {
+        let storedThemeRawValue = defaults.string(forKey: Keys.selectedTheme)
+        let storedThemeStyleVersion = defaults.integer(forKey: Keys.themeStyleVersion)
+        let loadedTheme = loadTheme(from: defaults)
+        let shouldMigrateLegacyTheme = storedThemeStyleVersion < currentThemeStyleVersion
+        let shouldMigrateLegacyAppleDefault = shouldMigrateLegacyTheme && loadedTheme == .apple
+        let shouldSeedFreshInstall = storedThemeRawValue == nil
+
+        if shouldMigrateLegacyAppleDefault {
+            defaults.set(ThemePreset.green.rawValue, forKey: Keys.selectedTheme)
+            defaults.set(currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
+        } else if shouldSeedFreshInstall {
+            defaults.set(ThemePreset.green.rawValue, forKey: Keys.selectedTheme)
+            defaults.set(currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
+        } else if shouldMigrateLegacyTheme {
+            defaults.set(currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
+        }
     }
 
     private static func loadString(forKey key: String, from defaults: UserDefaults, fallback: String = "") -> String {
