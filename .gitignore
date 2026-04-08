@@ -28,3 +28,5 @@ mac_handoff_*/
 slashvibe_v1_firmware-codex-slashvibe-bringup-autopilot/
 
 *.md
+
+board_protocol_test_report.json

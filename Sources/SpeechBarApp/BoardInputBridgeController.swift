@@ -18,6 +18,7 @@ private func boardBridgeDebugLog(_ message: String) {
 
 final class BoardInputBridgeController: @unchecked Sendable {
     private static let preferredPortDefaultsKey = "board.input.preferredSerialPort"
+    private static let preferredPythonEnvKey = "SLASHVIBE_PYTHON_EXECUTABLE"
 
     private let defaults: UserDefaults
     private let fileManager: FileManager
@@ -112,13 +113,13 @@ final class BoardInputBridgeController: @unchecked Sendable {
         fileManager.createFile(atPath: rawCaptureURL.path, contents: Data())
 
         let scriptURLs = try prepareBridgeScripts()
+        let pythonExecutable = resolvedPythonExecutable()
         let process = Process()
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.executableURL = URL(fileURLWithPath: pythonExecutable)
         process.currentDirectoryURL = scriptsRuntimeDirectory
         process.arguments = [
-            "python3",
             "-u",
             scriptURLs.bridge.path,
             "--port", portPath,
@@ -128,10 +129,13 @@ final class BoardInputBridgeController: @unchecked Sendable {
             "--source", "usbHID",
             "--hello-interval", "0.8"
         ]
+        process.environment = pythonEnvironment(vendorURL: scriptURLs.vendor)
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
 
-        boardBridgeDebugLog("launching CDC bridge on port=\(portPath), rawCapture=\(rawCaptureURL.path)")
+        boardBridgeDebugLog(
+            "launching CDC bridge on port=\(portPath), python=\(pythonExecutable), rawCapture=\(rawCaptureURL.path)"
+        )
         try process.run()
         currentProcess = process
         lastReportedPort = portPath
@@ -179,11 +183,12 @@ final class BoardInputBridgeController: @unchecked Sendable {
         }
     }
 
-    private func prepareBridgeScripts() throws -> (bridge: URL, proto: URL) {
+    private func prepareBridgeScripts() throws -> (bridge: URL, proto: URL, vendor: URL) {
         try fileManager.createDirectory(at: scriptsRuntimeDirectory, withIntermediateDirectories: true)
 
         let bridgeURL = scriptsRuntimeDirectory.appendingPathComponent("slashvibe_cdc_event_bridge.py")
         let protoURL = scriptsRuntimeDirectory.appendingPathComponent("slashvibe_host_proto.py")
+        let vendorURL = scriptsRuntimeDirectory.appendingPathComponent("python_vendor", isDirectory: true)
 
         try copyBridgeResource(
             named: "slashvibe_cdc_event_bridge",
@@ -195,8 +200,12 @@ final class BoardInputBridgeController: @unchecked Sendable {
             extension: "py",
             to: protoURL
         )
+        try copyBridgeDirectory(
+            named: "python_vendor",
+            to: vendorURL
+        )
 
-        return (bridgeURL, protoURL)
+        return (bridgeURL, protoURL, vendorURL)
     }
 
     private func copyBridgeResource(
@@ -220,6 +229,62 @@ final class BoardInputBridgeController: @unchecked Sendable {
             try fileManager.removeItem(at: destinationURL)
         }
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
+    }
+
+    private func copyBridgeDirectory(
+        named resourceName: String,
+        to destinationURL: URL
+    ) throws {
+        guard let sourceURL = Bundle.module.url(
+            forResource: resourceName,
+            withExtension: nil,
+            subdirectory: "HardwareBridge"
+        ) else {
+            throw NSError(
+                domain: "BoardInputBridgeController",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "找不到内置 CDC bridge 目录资源：\(resourceName)"]
+            )
+        }
+
+        if fileManager.fileExists(atPath: destinationURL.path) {
+            try fileManager.removeItem(at: destinationURL)
+        }
+        try fileManager.copyItem(at: sourceURL, to: destinationURL)
+    }
+
+    private func resolvedPythonExecutable() -> String {
+        let environment = ProcessInfo.processInfo.environment
+        let candidates = [
+            environment[Self.preferredPythonEnvKey],
+            "/usr/bin/python3",
+            "/Applications/Xcode.app/Contents/Developer/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3",
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3"
+        ]
+
+        for candidate in candidates {
+            guard let candidate,
+                  !candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  fileManager.isExecutableFile(atPath: candidate)
+            else {
+                continue
+            }
+            return candidate
+        }
+
+        return "/usr/bin/python3"
+    }
+
+    private func pythonEnvironment(vendorURL: URL) -> [String: String] {
+        var environment = ProcessInfo.processInfo.environment
+        let existing = environment["PYTHONPATH"]?
+            .split(separator: ":")
+            .map(String.init) ?? []
+        let merged = [vendorURL.path] + existing.filter { $0 != vendorURL.path }
+        environment["PYTHONPATH"] = merged.joined(separator: ":")
+        environment["PYTHONUNBUFFERED"] = "1"
+        return environment
     }
 
     private func preferredSerialPortPath() -> String? {
