@@ -168,6 +168,7 @@ private struct AppDependencies {
         let diagnosticsCoordinator = DiagnosticsCoordinator()
         let memoryFeatureFlagStore = MemoryFeatureFlagStore()
         let memoryCoordinator: MemoryCoordinator?
+        let memoryDemoSeeder: MemoryDemoSeeder?
         do {
             let memoryDatabaseURL = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(".slashvibe-memory.sqlite")
@@ -176,6 +177,7 @@ private struct AppDependencies {
                 databaseURL: memoryDatabaseURL,
                 keyProvider: memoryKeyProvider
             )
+            memoryDemoSeeder = MemoryDemoSeeder(store: memoryStore)
             memoryCoordinator = MemoryCoordinator(
                 store: memoryStore,
                 extractor: DefaultMemoryExtractor()
@@ -186,12 +188,29 @@ private struct AppDependencies {
                 severity: .warning,
                 metadata: ["error": error.localizedDescription]
             )
+            memoryDemoSeeder = nil
             memoryCoordinator = nil
         }
         let memoryConstellationStore = MemoryConstellationStore(
             catalog: memoryCoordinator,
             featureFlags: memoryFeatureFlagStore
         )
+        if let memoryDemoSeeder {
+            Task {
+                do {
+                    let inserted = try await memoryDemoSeeder.seedMissingDemoMemories()
+                    if inserted > 0 {
+                        await memoryConstellationStore.reload()
+                    }
+                } catch {
+                    diagnosticsCoordinator.recordMemoryEvent(
+                        "Failed to seed memory demo data",
+                        severity: .warning,
+                        metadata: ["error": error.localizedDescription]
+                    )
+                }
+            }
+        }
         let registry = DefaultAgentRegistry()
         let collectors = registry.makeEnabledCollectors()
         let reducer = DefaultAgentStateReducer(
