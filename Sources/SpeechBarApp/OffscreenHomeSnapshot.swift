@@ -13,6 +13,8 @@ struct OffscreenHomeSnapshotCommand: Sendable {
     let outputURL: URL
     let section: SectionOverride?
     let theme: ThemeOverride?
+    let memoryScenario: MemoryScenario
+    let memoryDisplayMode: MemoryConstellationDisplayMode?
     let width: CGFloat
     let height: CGFloat
     let scale: CGFloat
@@ -58,6 +60,8 @@ struct OffscreenHomeSnapshotCommand: Sendable {
             .flatMap { SectionOverride(rawValue: $0.lowercased()) }
         let theme = value(after: "--theme")
             .flatMap { ThemeOverride(rawValue: $0.lowercased()) }
+        let memoryScenario = Self.parseCaseInsensitive(value(after: "--memory-scenario"), as: MemoryScenario.self) ?? .default
+        let memoryDisplayMode = Self.parseCaseInsensitive(value(after: "--memory-display-mode"), as: MemoryConstellationDisplayMode.self)
         let width = value(after: "--width").flatMap(Double.init) ?? 1240
         let height = value(after: "--height").flatMap(Double.init) ?? 780
         let scale = value(after: "--scale").flatMap(Double.init) ?? 2
@@ -66,10 +70,23 @@ struct OffscreenHomeSnapshotCommand: Sendable {
             outputURL: outputURL,
             section: section,
             theme: theme,
+            memoryScenario: memoryScenario,
+            memoryDisplayMode: memoryDisplayMode,
             width: CGFloat(width),
             height: CGFloat(height),
             scale: CGFloat(scale)
         )
+    }
+
+    private static func parseCaseInsensitive<T>(_ value: String?, as type: T.Type) -> T?
+    where T: RawRepresentable & CaseIterable, T.RawValue == String {
+        guard let value else {
+            return nil
+        }
+
+        return T.allCases.first {
+            $0.rawValue.compare(value, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
     }
 }
 
@@ -90,8 +107,7 @@ enum OffscreenHomeSnapshotRenderer {
         let defaultsContext = SnapshotDefaultsContext()
         defer { defaultsContext.cleanup() }
 
-        let environment = SnapshotEnvironment(defaults: defaultsContext.defaults)
-        environment.apply(command: command)
+        let environment = SnapshotEnvironment(defaults: defaultsContext.defaults, command: command)
 
         let rootView = HomeWindowView(
             coordinator: environment.coordinator,
@@ -162,9 +178,10 @@ private final class SnapshotEnvironment {
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
     let memoryFeatureFlagStore: MemoryFeatureFlagStore
+    let memoryConstellationStore: MemoryConstellationStore
     let homeStore: HomeWindowStore
 
-    init(defaults: UserDefaults) {
+    init(defaults: UserDefaults, command: OffscreenHomeSnapshotCommand) {
         self.defaults = defaults
         self.pushToTalkSource = OnScreenPushToTalkSource()
 
@@ -212,6 +229,16 @@ private final class SnapshotEnvironment {
         self.userProfileStore = UserProfileStore(defaults: defaults)
         self.audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
         self.memoryFeatureFlagStore = MemoryFeatureFlagStore(defaults: defaults)
+        if let memoryDisplayMode = command.memoryDisplayMode {
+            self.memoryFeatureFlagStore.displayMode = memoryDisplayMode
+        }
+
+        let memoryCatalog = MemoryConstellationFixtures.catalogProvider(for: command.memoryScenario)
+        self.memoryConstellationStore = MemoryConstellationStore(
+            catalog: memoryCatalog,
+            featureFlags: memoryFeatureFlagStore,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
         self.diagnosticsCoordinator = DiagnosticsCoordinator(
             baseDirectory: FileManager.default.temporaryDirectory
                 .appendingPathComponent("slashvibe-offscreen-diagnostics", isDirectory: true)
@@ -251,15 +278,13 @@ private final class SnapshotEnvironment {
             coordinator: coordinator,
             defaults: defaults
         )
-    }
 
-    func apply(command: OffscreenHomeSnapshotCommand) {
         if let section = command.section.flatMap(Self.mapSection(from:)) {
-            homeStore.saveSelectedSection(section)
+            self.homeStore.saveSelectedSection(section)
         }
 
         if let theme = command.theme.flatMap(Self.mapTheme(from:)) {
-            homeStore.selectedTheme = theme
+            self.homeStore.selectedTheme = theme
         }
     }
 
