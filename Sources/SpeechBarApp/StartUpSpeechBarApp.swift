@@ -19,6 +19,9 @@ struct SlashVibeApp: App {
             return
         }
 
+        AppSingletonCoordinator().terminateOtherInstances(
+            bundleIdentifier: Bundle.main.bundleIdentifier
+        )
         SlashVibeMigration.runIfNeeded()
         self.dependencies = AppDependencies()
     }
@@ -57,6 +60,7 @@ private struct AppDependencies {
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
     let modelSettingsStore: OpenAIModelSettingsStore
+    let polishPlaygroundStore: PolishPlaygroundStore
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
     let windowSwitchOverlayStore: WindowSwitchOverlayStore
@@ -143,6 +147,16 @@ private struct AppDependencies {
             credentialProvider: openAICredentialProvider,
             configurationProvider: modelSettingsStore
         )
+        let polishPlaygroundStore = PolishPlaygroundStore { [userProfileStore] transcript in
+            let context = await userProfileStore.currentContext()
+            guard context.polishMode != .off else {
+                throw PolishPlaygroundError.polishDisabled
+            }
+            return try await transcriptPostProcessor.polish(
+                transcript: transcript,
+                context: context
+            )
+        }
         let focusedTextTranscriptPublisher = FocusedTextTranscriptPublisher(
             applicationTracker: applicationTracker,
             promptForAccessibilityAtLaunch: true
@@ -190,6 +204,7 @@ private struct AppDependencies {
         self.userProfileStore = userProfileStore
         self.audioInputSettingsStore = audioInputSettingsStore
         self.modelSettingsStore = modelSettingsStore
+        self.polishPlaygroundStore = polishPlaygroundStore
         self.localWhisperModelStore = localWhisperModelStore
         self.senseVoiceModelStore = senseVoiceModelStore
         self.windowSwitchOverlayStore = windowSwitchOverlayStore
@@ -257,6 +272,7 @@ private struct AppDependencies {
             userProfileStore: userProfileStore,
             audioInputSettingsStore: audioInputSettingsStore,
             modelSettingsStore: modelSettingsStore,
+            polishPlaygroundStore: polishPlaygroundStore,
             localWhisperModelStore: localWhisperModelStore,
             senseVoiceModelStore: senseVoiceModelStore,
             memoryFeatureFlagStore: memoryFeatureFlagStore

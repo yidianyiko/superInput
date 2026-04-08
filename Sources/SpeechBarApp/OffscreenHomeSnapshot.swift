@@ -102,6 +102,7 @@ enum OffscreenHomeSnapshotRenderer {
             userProfileStore: environment.userProfileStore,
             audioInputSettingsStore: environment.audioInputSettingsStore,
             modelSettingsStore: environment.modelSettingsStore,
+            polishPlaygroundStore: environment.polishPlaygroundStore,
             localWhisperModelStore: environment.localWhisperModelStore,
             senseVoiceModelStore: environment.senseVoiceModelStore,
             memoryFeatureFlagStore: environment.memoryFeatureFlagStore,
@@ -159,6 +160,7 @@ private final class SnapshotEnvironment {
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
     let modelSettingsStore: OpenAIModelSettingsStore
+    let polishPlaygroundStore: PolishPlaygroundStore
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
     let memoryFeatureFlagStore: MemoryFeatureFlagStore
@@ -200,6 +202,9 @@ private final class SnapshotEnvironment {
             localWhisperModelStore: localWhisperModelStore,
             senseVoiceModelStore: senseVoiceModelStore
         )
+        self.polishPlaygroundStore = PolishPlaygroundStore { transcript in
+            transcript
+        }
 
         let credentialProvider = SwitchingSpeechCredentialProvider(
             defaults: defaults,

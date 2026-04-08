@@ -6,6 +6,18 @@ import SpeechBarInfrastructure
 @Suite("OpenAIModelSettingsStore")
 struct OpenAIModelSettingsStoreTests {
     @Test
+    func normalizingSharedEndpointAppendsResponsesPathForOpenAIBaseURL() {
+        var configuration = OpenAIModelSettingsStore.StoredConfiguration()
+        configuration.researchEndpoint = "https://api.openai.com/v1"
+
+        let normalized = OpenAIModelSettingsStore.StoredConfiguration.normalized(configuration)
+
+        #expect(normalized.researchEndpoint == "https://api.openai.com/v1/responses")
+        #expect(normalized.polishEndpoint == "https://api.openai.com/v1/responses")
+        #expect(normalized.openAISpeechEndpoint == "https://api.openai.com/v1/audio/transcriptions")
+    }
+
+    @Test
     func storedConfigurationLoadsLegacyPayloadsWithoutResettingProvider() throws {
         let suiteName = "OpenAIModelSettingsStoreTests.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {

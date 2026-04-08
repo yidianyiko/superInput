@@ -11,6 +11,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
     private let diagnosticsCoordinator: DiagnosticsCoordinator
     private let userProfileStore: UserProfileStore
     private let modelSettingsStore: OpenAIModelSettingsStore
+    private let polishPlaygroundStore: PolishPlaygroundStore
     private let audioInputSettingsStore: AudioInputSettingsStore
     private let localWhisperModelStore: LocalWhisperModelStore
     private let senseVoiceModelStore: SenseVoiceModelStore
@@ -25,6 +26,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         userProfileStore: UserProfileStore,
         audioInputSettingsStore: AudioInputSettingsStore,
         modelSettingsStore: OpenAIModelSettingsStore,
+        polishPlaygroundStore: PolishPlaygroundStore,
         localWhisperModelStore: LocalWhisperModelStore,
         senseVoiceModelStore: SenseVoiceModelStore,
         memoryFeatureFlagStore: MemoryFeatureFlagStore
@@ -35,6 +37,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         self.diagnosticsCoordinator = diagnosticsCoordinator
         self.userProfileStore = userProfileStore
         self.modelSettingsStore = modelSettingsStore
+        self.polishPlaygroundStore = polishPlaygroundStore
         self.audioInputSettingsStore = audioInputSettingsStore
         self.localWhisperModelStore = localWhisperModelStore
         self.senseVoiceModelStore = senseVoiceModelStore
@@ -49,6 +52,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
                 userProfileStore: userProfileStore,
                 audioInputSettingsStore: audioInputSettingsStore,
                 modelSettingsStore: modelSettingsStore,
+                polishPlaygroundStore: polishPlaygroundStore,
                 localWhisperModelStore: localWhisperModelStore,
                 senseVoiceModelStore: senseVoiceModelStore,
                 memoryFeatureFlagStore: memoryFeatureFlagStore,

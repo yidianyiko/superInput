@@ -14,6 +14,7 @@ struct HomeWindowView: View {
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var audioInputSettingsStore: AudioInputSettingsStore
     @ObservedObject var modelSettingsStore: OpenAIModelSettingsStore
+    @ObservedObject var polishPlaygroundStore: PolishPlaygroundStore
     @ObservedObject var localWhisperModelStore: LocalWhisperModelStore
     @ObservedObject var senseVoiceModelStore: SenseVoiceModelStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
@@ -687,7 +688,7 @@ struct HomeWindowView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     sectionHeader(
                         title: "输入记忆",
-                        subtitle: "采集默认开启，召回默认关闭，便于先观察本地学习效果。"
+                        subtitle: "采集和召回默认开启，可随时按需关闭。"
                     )
 
                     Toggle("启用记忆采集", isOn: $memoryFeatureFlagStore.captureEnabled)
@@ -1065,6 +1066,53 @@ struct HomeWindowView: View {
                             Divider()
                         }
                     }
+                }
+            }
+
+            GlassCard(palette: store.palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionHeader(
+                        title: "润色测试台",
+                        subtitle: "直接调用当前 OpenAI 润色链路，不需要录音，也不会触发短句跳过逻辑。"
+                    )
+
+                    PlaceholderTextEditor(
+                        text: $polishPlaygroundStore.inputText,
+                        placeholder: "粘贴一段待润色的原始文本，例如一段口语化、重复较多的转写结果。"
+                    )
+                    .frame(minHeight: 180)
+
+                    HStack(spacing: 10) {
+                        Button(polishPlaygroundStore.isRunning ? "测试中..." : "直接测试润色") {
+                            Task {
+                                await polishPlaygroundStore.runCurrentInput()
+                            }
+                        }
+                        .buttonStyle(PrimaryPanelButtonStyle(palette: store.palette, isActive: false))
+                        .disabled(polishPlaygroundStore.isRunning)
+
+                        Button("填入当前最终文本") {
+                            let latestTranscript = coordinator.finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? coordinator.rawFinalTranscript
+                                : coordinator.finalTranscript
+                            polishPlaygroundStore.inputText = latestTranscript
+                        }
+                        .buttonStyle(SecondaryPanelButtonStyle(palette: store.palette))
+                        .disabled(
+                            coordinator.finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                                coordinator.rawFinalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        )
+                    }
+
+                    Text(polishPlaygroundStore.statusMessage)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    transcriptBubble(
+                        title: "润色输出",
+                        text: polishPlaygroundStore.outputText,
+                        placeholder: "点击按钮后，这里会显示当前 persona、术语词表和润色模型共同作用下的输出。"
+                    )
                 }
             }
         }

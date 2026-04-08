@@ -6,13 +6,13 @@ import Testing
 struct MemoryFeatureFlagStoreTests {
     @Test
     @MainActor
-    func defaultsToLearnOnlyMode() {
+    func defaultsToCaptureAndRecallEnabled() {
         let suiteName = "MemoryFeatureFlagStoreTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let store = MemoryFeatureFlagStore(defaults: defaults)
         #expect(store.captureEnabled)
-        #expect(!store.recallEnabled)
+        #expect(store.recallEnabled)
     }
 }

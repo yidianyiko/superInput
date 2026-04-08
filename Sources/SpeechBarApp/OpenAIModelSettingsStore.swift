@@ -117,7 +117,8 @@ final class OpenAIModelSettingsStore: ObservableObject, OpenAIResponsesConfigura
             var result = configuration
 
             let trimmedResearch = result.researchEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
-            let researchEndpoint = trimmedResearch.isEmpty ? defaultResponsesEndpoint : trimmedResearch
+            let researchEndpoint = responsesEndpoint(fromSharedEndpoint: trimmedResearch)?.absoluteString
+                ?? defaultResponsesEndpoint
             result.researchEndpoint = researchEndpoint
 
             // Keep research/polish on the same API endpoint.
@@ -160,6 +161,43 @@ final class OpenAIModelSettingsStore: ObservableObject, OpenAIResponsesConfigura
             }
 
             return result
+        }
+
+        static func responsesEndpoint(fromSharedEndpoint endpoint: String) -> URL? {
+            guard var components = URLComponents(string: endpoint) else { return nil }
+
+            let rawPath = components.path.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalizedPath =
+                if rawPath == "/" {
+                    ""
+                } else if rawPath.hasSuffix("/") {
+                    String(rawPath.dropLast())
+                } else {
+                    rawPath
+                }
+
+            if normalizedPath.hasSuffix("/responses") {
+                components.path = normalizedPath
+                return components.url
+            }
+
+            if normalizedPath.hasSuffix("/audio/transcriptions") {
+                components.path = String(normalizedPath.dropLast("/audio/transcriptions".count)) + "/responses"
+                return components.url
+            }
+
+            if normalizedPath.hasSuffix("/v1") {
+                components.path = normalizedPath + "/responses"
+                return components.url
+            }
+
+            if normalizedPath.isEmpty {
+                components.path = "/v1/responses"
+                return components.url
+            }
+
+            components.path = normalizedPath + "/responses"
+            return components.url
         }
 
         static func whisperEndpoint(fromResponsesEndpoint endpoint: String) -> URL? {

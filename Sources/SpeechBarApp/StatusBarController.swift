@@ -22,6 +22,7 @@ final class StatusBarController: NSObject {
         userProfileStore: UserProfileStore,
         audioInputSettingsStore: AudioInputSettingsStore,
         modelSettingsStore: OpenAIModelSettingsStore,
+        polishPlaygroundStore: PolishPlaygroundStore,
         localWhisperModelStore: LocalWhisperModelStore,
         senseVoiceModelStore: SenseVoiceModelStore,
         memoryFeatureFlagStore: MemoryFeatureFlagStore
@@ -38,6 +39,7 @@ final class StatusBarController: NSObject {
             userProfileStore: userProfileStore,
             audioInputSettingsStore: audioInputSettingsStore,
             modelSettingsStore: modelSettingsStore,
+            polishPlaygroundStore: polishPlaygroundStore,
             localWhisperModelStore: localWhisperModelStore,
             senseVoiceModelStore: senseVoiceModelStore,
             memoryFeatureFlagStore: memoryFeatureFlagStore
