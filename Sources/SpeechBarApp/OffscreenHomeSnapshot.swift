@@ -93,9 +93,9 @@ struct OffscreenHomeSnapshotCommand: Sendable {
 
 enum OffscreenHomeSnapshotRenderer {
     @MainActor
-    static func run(_ command: OffscreenHomeSnapshotCommand) -> Int32 {
+    static func run(_ command: OffscreenHomeSnapshotCommand) async -> Int32 {
         do {
-            try render(command)
+            try await render(command)
             return 0
         } catch {
             fputs("error: \(error.localizedDescription)\n", stderr)
@@ -104,18 +104,16 @@ enum OffscreenHomeSnapshotRenderer {
     }
 
     @MainActor
-    private static func render(_ command: OffscreenHomeSnapshotCommand) throws {
+    private static func render(_ command: OffscreenHomeSnapshotCommand) async throws {
         let defaultsContext = SnapshotDefaultsContext()
         defer { defaultsContext.cleanup() }
 
         let environment = SnapshotEnvironment(defaults: defaultsContext.defaults, command: command)
 
         if command.section == .memory {
-            waitForMainActorTask {
-                await preloadMemoryConstellation(reload: {
-                    await environment.memoryConstellationStore.reload()
-                })
-            }
+            await preloadMemoryConstellation(reload: {
+                await environment.memoryConstellationStore.reload()
+            })
         }
 
         let rootView = HomeWindowView(
@@ -163,21 +161,6 @@ enum OffscreenHomeSnapshotRenderer {
         reload: @escaping @Sendable () async -> Void
     ) async {
         await reload()
-    }
-
-    private static func waitForMainActorTask(
-        _ operation: @escaping @Sendable () async -> Void
-    ) {
-        let semaphore = DispatchSemaphore(value: 0)
-
-        Task {
-            await operation()
-            semaphore.signal()
-        }
-
-        while semaphore.wait(timeout: .now()) == .timedOut {
-            RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
-        }
     }
 }
 

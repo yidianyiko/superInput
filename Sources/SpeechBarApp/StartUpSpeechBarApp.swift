@@ -40,7 +40,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         Task { @MainActor in
-            let exitCode = OffscreenHomeSnapshotRenderer.run(command)
+            let exitCode = await OffscreenHomeSnapshotRenderer.run(command)
             fflush(stdout)
             fflush(stderr)
             exit(exitCode)
