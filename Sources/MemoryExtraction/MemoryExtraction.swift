@@ -91,8 +91,7 @@ public struct DefaultMemoryExtractor: MemoryExtractor {
     }
 
     private func styleMemory(from event: InputEvent) -> MemoryItem? {
-        guard event.actionType == .polish,
-              let final = event.effectiveLearningText?.trimmingCharacters(in: .whitespacesAndNewlines),
+        guard let final = event.effectiveLearningText?.trimmingCharacters(in: .whitespacesAndNewlines),
               !final.isEmpty else {
             return nil
         }

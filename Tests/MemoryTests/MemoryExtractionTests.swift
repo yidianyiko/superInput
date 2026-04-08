@@ -94,4 +94,60 @@ struct MemoryExtractionTests {
         let memories = try await extractor.extract(from: event)
         #expect(memories.allSatisfy { $0.confidence <= 0.55 })
     }
+
+    @Test
+    func transcribeEventCreatesStyleMemory() async throws {
+        let extractor = DefaultMemoryExtractor()
+        let event = makeEvent(
+            rawTranscript: "reply shortly",
+            insertedText: "reply shortly",
+            finalUserEditedText: "reply shortly"
+        )
+
+        let memories = try await extractor.extract(from: event)
+
+        let style = try #require(memories.first { $0.type == .style })
+        #expect(style.valueFingerprint == "brevity=short")
+        #expect(style.scope == .app("com.apple.TextEdit"))
+        #expect(style.confidence == 0.65)
+    }
+}
+
+private func makeEvent(
+    appIdentifier: String = "com.apple.TextEdit",
+    appName: String = "TextEdit",
+    windowTitle: String? = "Untitled",
+    pageTitle: String? = nil,
+    fieldRole: String = "AXTextArea",
+    fieldLabel: String? = "Body",
+    sensitivityClass: SensitivityClass = .normal,
+    observationStatus: ObservationStatus = .observedFinal,
+    actionType: MemoryActionType = .transcribe,
+    rawTranscript: String? = "hello world",
+    polishedText: String? = nil,
+    insertedText: String? = "hello world",
+    finalUserEditedText: String? = "hello world"
+) -> InputEvent {
+    InputEvent(
+        id: UUID(),
+        timestamp: Date(timeIntervalSince1970: 0),
+        languageCode: "en",
+        localeIdentifier: "en-US",
+        appIdentifier: appIdentifier,
+        appName: appName,
+        windowTitle: windowTitle,
+        pageTitle: pageTitle,
+        fieldRole: fieldRole,
+        fieldLabel: fieldLabel,
+        sensitivityClass: sensitivityClass,
+        observationStatus: observationStatus,
+        actionType: actionType,
+        rawTranscript: rawTranscript,
+        polishedText: polishedText,
+        insertedText: insertedText,
+        finalUserEditedText: finalUserEditedText,
+        outcome: .published,
+        durationMs: 900,
+        source: .speech
+    )
 }
