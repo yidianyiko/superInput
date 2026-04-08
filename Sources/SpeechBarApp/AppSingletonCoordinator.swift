@@ -30,18 +30,24 @@ extension NSRunningApplication: RunningApplicationControlling {}
 @MainActor
 struct AppSingletonCoordinator {
     let runningApplicationsProvider: (String) -> [any RunningApplicationControlling]
-    let sleep: (TimeInterval) -> Void
+    let scheduleAfter: (TimeInterval, @escaping @MainActor () -> Void) -> Void
     let logger: (String) -> Void
 
     init(
         runningApplicationsProvider: @escaping (String) -> [any RunningApplicationControlling] = {
             NSRunningApplication.runningApplications(withBundleIdentifier: $0)
         },
-        sleep: @escaping (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) },
+        scheduleAfter: @escaping (TimeInterval, @escaping @MainActor () -> Void) -> Void = { delay, action in
+            let delayMilliseconds = max(0, Int((delay * 1_000).rounded()))
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(delayMilliseconds))
+                action()
+            }
+        },
         logger: @escaping (String) -> Void = singletonLog
     ) {
         self.runningApplicationsProvider = runningApplicationsProvider
-        self.sleep = sleep
+        self.scheduleAfter = scheduleAfter
         self.logger = logger
     }
 
@@ -69,11 +75,17 @@ struct AppSingletonCoordinator {
         let remainingAfterTerminate = otherInstances.filter { !$0.isTerminated }
         guard !remainingAfterTerminate.isEmpty else { return }
 
-        sleep(gracePeriod)
+        let remainingProcessIdentifiers = Set(remainingAfterTerminate.map(\.processIdentifier))
 
-        for application in otherInstances where !application.isTerminated {
-            _ = application.forceTerminate()
-            logger("force terminated pid=\(application.processIdentifier)")
+        scheduleAfter(gracePeriod) {
+            let remainingInstances = runningApplicationsProvider(bundleIdentifier)
+                .filter { $0.processIdentifier != currentProcessIdentifier }
+                .filter { remainingProcessIdentifiers.contains($0.processIdentifier) }
+
+            for application in remainingInstances where !application.isTerminated {
+                _ = application.forceTerminate()
+                logger("force terminated pid=\(application.processIdentifier)")
+            }
         }
     }
 }

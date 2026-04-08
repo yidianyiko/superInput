@@ -1,4 +1,5 @@
 import Darwin
+import Foundation
 import Testing
 @testable import SpeechBarApp
 
@@ -9,10 +10,14 @@ struct AppSingletonCoordinatorTests {
     func terminatesAndForceTerminatesOtherInstances() {
         let current = MockRunningApplication(processIdentifier: 100, bundleIdentifier: "com.slashvibe.desktop.local")
         let lingering = MockRunningApplication(processIdentifier: 200, bundleIdentifier: "com.slashvibe.desktop.local")
-        var sleepCalls = 0
+        var scheduledGracePeriod: TimeInterval?
+        var scheduledForceTerminate: (@MainActor () -> Void)?
         let coordinator = AppSingletonCoordinator(
             runningApplicationsProvider: { _ in [current, lingering] },
-            sleep: { _ in sleepCalls += 1 },
+            scheduleAfter: { delay, action in
+                scheduledGracePeriod = delay
+                scheduledForceTerminate = action
+            },
             logger: { _ in }
         )
 
@@ -24,8 +29,12 @@ struct AppSingletonCoordinatorTests {
         #expect(current.terminateCallCount == 0)
         #expect(current.forceTerminateCallCount == 0)
         #expect(lingering.terminateCallCount == 1)
+        #expect(lingering.forceTerminateCallCount == 0)
+        #expect(scheduledGracePeriod == 0.4)
+
+        scheduledForceTerminate?()
+
         #expect(lingering.forceTerminateCallCount == 1)
-        #expect(sleepCalls == 1)
     }
 
     @Test
@@ -38,10 +47,10 @@ struct AppSingletonCoordinatorTests {
                 app.markTerminated()
             }
         )
-        var sleepCalls = 0
+        var scheduleCalls = 0
         let coordinator = AppSingletonCoordinator(
             runningApplicationsProvider: { _ in [exiting] },
-            sleep: { _ in sleepCalls += 1 },
+            scheduleAfter: { _, _ in scheduleCalls += 1 },
             logger: { _ in }
         )
 
@@ -52,7 +61,7 @@ struct AppSingletonCoordinatorTests {
 
         #expect(exiting.terminateCallCount == 1)
         #expect(exiting.forceTerminateCallCount == 0)
-        #expect(sleepCalls == 0)
+        #expect(scheduleCalls == 0)
     }
 
     @Test
@@ -64,8 +73,8 @@ struct AppSingletonCoordinatorTests {
                 providerCalls += 1
                 return []
             },
-            sleep: { _ in
-                Issue.record("sleep should not be called")
+            scheduleAfter: { _, _ in
+                Issue.record("scheduleAfter should not be called")
             },
             logger: { _ in }
         )
