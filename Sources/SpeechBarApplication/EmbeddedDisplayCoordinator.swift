@@ -4,6 +4,8 @@ import SpeechBarDomain
 
 @MainActor
 public final class EmbeddedDisplayCoordinator: ObservableObject {
+    private static let defaultSnapshotRebuildDebounceDuration: Duration = .milliseconds(120)
+
     @Published public private(set) var connectionState: EmbeddedBoardConnectionState = .disconnected
     @Published public private(set) var lastSnapshot: EmbeddedDisplaySnapshot?
     @Published public private(set) var lastSentAt: Date?
@@ -19,11 +21,14 @@ public final class EmbeddedDisplayCoordinator: ObservableObject {
     private let displayBuilder: any EmbeddedDisplaySnapshotBuilding
     private let encoder: any EmbeddedDisplayEncoding
     private let transport: any EmbeddedBoardTransport
+    private let sleepClock: any SleepClock
+    private let snapshotRebuildDebounceDuration: Duration
 
     private var cancellables: Set<AnyCancellable> = []
     private var inboundTask: Task<Void, Never>?
     private var connectionTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
+    private var pendingRebuildTask: Task<Void, Never>?
     private var pendingSendTask: Task<Void, Never>?
     private var pendingAckTasks: [UInt64: Task<Void, Never>] = [:]
     private var hasStarted = false
@@ -39,7 +44,9 @@ public final class EmbeddedDisplayCoordinator: ObservableObject {
         diagnostics: DiagnosticsCoordinator,
         displayBuilder: any EmbeddedDisplaySnapshotBuilding,
         encoder: any EmbeddedDisplayEncoding,
-        transport: any EmbeddedBoardTransport
+        transport: any EmbeddedBoardTransport,
+        sleepClock: any SleepClock = ContinuousSleepClock(),
+        snapshotRebuildDebounceDuration: Duration = .milliseconds(120)
     ) {
         self.voiceCoordinator = voiceCoordinator
         self.monitorCoordinator = monitorCoordinator
@@ -47,12 +54,15 @@ public final class EmbeddedDisplayCoordinator: ObservableObject {
         self.displayBuilder = displayBuilder
         self.encoder = encoder
         self.transport = transport
+        self.sleepClock = sleepClock
+        self.snapshotRebuildDebounceDuration = snapshotRebuildDebounceDuration
     }
 
     deinit {
         inboundTask?.cancel()
         connectionTask?.cancel()
         heartbeatTask?.cancel()
+        pendingRebuildTask?.cancel()
         pendingSendTask?.cancel()
         pendingAckTasks.values.forEach { $0.cancel() }
     }
@@ -93,20 +103,21 @@ public final class EmbeddedDisplayCoordinator: ObservableObject {
         monitorCoordinator.$taskBoardSnapshot
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                self?.rebuildSnapshot(reason: "task-board-update", forceSend: false)
+                self?.scheduleSnapshotRebuild(reason: "task-board-update", forceSend: false)
             }
             .store(in: &cancellables)
 
         voiceCoordinator.$audioLevelWindow
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                self?.rebuildSnapshot(reason: "audio-level", forceSend: false)
+                self?.scheduleSnapshotRebuild(reason: "audio-level", forceSend: false)
             }
             .store(in: &cancellables)
 
         voiceCoordinator.$overlayPhase
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
+                self?.pendingRebuildTask?.cancel()
                 self?.rebuildSnapshot(reason: "overlay-phase", forceSend: true)
             }
             .store(in: &cancellables)
@@ -114,9 +125,28 @@ public final class EmbeddedDisplayCoordinator: ObservableObject {
         voiceCoordinator.$overlaySubtitle
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                self?.rebuildSnapshot(reason: "overlay-subtitle", forceSend: false)
+                self?.scheduleSnapshotRebuild(reason: "overlay-subtitle", forceSend: false)
             }
             .store(in: &cancellables)
+    }
+
+    private func scheduleSnapshotRebuild(reason: String, forceSend: Bool) {
+        pendingRebuildTask?.cancel()
+        let debounceDuration = snapshotRebuildDebounceDuration
+        pendingRebuildTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.sleepClock.sleep(for: debounceDuration)
+            } catch {
+                return
+            }
+            self.performScheduledSnapshotRebuild(reason: reason, forceSend: forceSend)
+        }
+    }
+
+    private func performScheduledSnapshotRebuild(reason: String, forceSend: Bool) {
+        pendingRebuildTask = nil
+        rebuildSnapshot(reason: reason, forceSend: forceSend)
     }
 
     private func rebuildSnapshot(reason: String, forceSend: Bool) {
