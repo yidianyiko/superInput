@@ -31,7 +31,7 @@
 
 - [ ] **Step 1: Write the failing test**
 
-Append this test and helper to `Tests/MemoryTests/MemoryExtractionTests.swift`:
+Replace the final `}` at the end of `Tests/MemoryTests/MemoryExtractionTests.swift` with this tail block so the new test stays inside `MemoryExtractionTests` and the helper lives below the suite:
 
 ```swift
     @Test
@@ -391,7 +391,17 @@ Expected:
 - `swift test` exits `0`
 - `swift build` exits `0`
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Run manual verification**
+
+Use the built app and perform these checks:
+
+- complete one normal voice input in a field with a real accessibility label and confirm the constellation grows with visible `vocabulary`, `scene`, and `style` stars
+- complete one normal voice input in a sparse field where `fieldLabel == nil` but `windowTitle` is present and confirm a scene star still appears
+- complete one secure or opted-out input and confirm no new visible memory appears
+
+Expected: the memory count grows more aggressively for normal inputs, while secure and opted-out inputs remain excluded.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add Tests/MemoryTests/MemoryExtractionTests.swift Sources/MemoryExtraction/MemoryExtraction.swift
