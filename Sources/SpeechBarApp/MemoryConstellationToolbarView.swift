@@ -10,8 +10,8 @@ struct MemoryConstellationToolbarView: View {
         MemoryConstellationPanel(padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
                 toolbarGroup(
-                    title: "Cluster Filter",
-                    subtitle: "Read the sky by region before detail."
+                    title: "星团筛选",
+                    subtitle: "先按区域读图，再看细节。"
                 ) {
                     ForEach(MemoryConstellationClusterFilter.allCases) { filter in
                         MemoryConstellationChip(
@@ -24,8 +24,8 @@ struct MemoryConstellationToolbarView: View {
                 }
 
                 toolbarGroup(
-                    title: "View Mode",
-                    subtitle: "Switch between the spatial overview, bridge stories, and replay."
+                    title: "视图模式",
+                    subtitle: "可在空间总览、关系解读和时间回放之间切换。"
                 ) {
                     ForEach(MemoryConstellationViewMode.allCases) { mode in
                         MemoryConstellationChip(
@@ -65,13 +65,13 @@ struct MemoryConstellationToolbarView: View {
     private func filterTitle(_ filter: MemoryConstellationClusterFilter) -> String {
         switch filter {
         case .all:
-            return "All"
+            return "全部"
         case .vocabulary:
-            return "Vocabulary"
+            return "词汇"
         case .style:
-            return "Style"
+            return "风格"
         case .scenes:
-            return "Scenes"
+            return "场景"
         }
     }
 }

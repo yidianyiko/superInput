@@ -7,10 +7,12 @@ struct MemoryConstellationCanvasView: View {
     let snapshot: MemoryConstellationSnapshot
     let focus: MemoryConstellationFocus
     let selectedViewMode: MemoryConstellationViewMode
+    let capturePulseToken: Int
     let hoverCluster: (MemoryConstellationClusterKind?) -> Void
     let focusBridge: (UUID?) -> Void
 
     @State private var interactionState = MemoryConstellationClusterInteractionState()
+    @State private var capturePulseProgress: CGFloat = 0
 
     private let clusterAnchors: [MemoryConstellationClusterKind: UnitPoint] = [
         .vocabulary: UnitPoint(x: 0.24, y: 0.34),
@@ -57,6 +59,14 @@ struct MemoryConstellationCanvasView: View {
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .stroke(Color.white.opacity(0.10), lineWidth: 1)
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(
+                                MemoryConstellationTheme.focusGold.opacity(0.32 * capturePulseProgress),
+                                lineWidth: 1 + (capturePulseProgress * 3)
+                            )
+                            .blur(radius: capturePulseProgress * 1.2)
+                    )
                 }
             }
             .frame(minHeight: 470)
@@ -71,6 +81,9 @@ struct MemoryConstellationCanvasView: View {
         .accessibilityElement(children: .contain)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: focusAccessibilityKey)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: snapshot.highlightedBridges.map(\.id))
+        .task(id: capturePulseToken) {
+            await playCapturePulseIfNeeded()
+        }
         .onChange(of: focus) { newFocus in
             interactionState.sync(with: newFocus)
         }
@@ -102,6 +115,7 @@ struct MemoryConstellationCanvasView: View {
         let midpoint = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
         let focused = bridge.isFocused || focus == .bridge(bridge.id)
         let lift = reduceMotion ? 0 : MemoryConstellationMotion.bridgeLift(bridgeIndex: bridgeIndex, phase: phase)
+        let pulseBoost = capturePulseProgress * 1.2
 
         return ZStack {
             Path { path in
@@ -123,9 +137,9 @@ struct MemoryConstellationCanvasView: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
-                style: StrokeStyle(lineWidth: (focused ? 4 : 2) + (lift * 0.05), lineCap: .round, dash: focused ? [] : [8, 8])
+                style: StrokeStyle(lineWidth: (focused ? 4 : 2) + (lift * 0.05) + pulseBoost, lineCap: .round, dash: focused ? [] : [8, 8])
             )
-            .shadow(color: MemoryConstellationTheme.accentGold.opacity(focused ? 0.42 : 0.18), radius: (focused ? 10 : 4) + (lift * 0.18))
+            .shadow(color: MemoryConstellationTheme.accentGold.opacity((focused ? 0.42 : 0.18) + (capturePulseProgress * 0.16)), radius: (focused ? 10 : 4) + (lift * 0.18) + (capturePulseProgress * 5))
             .accessibilityHidden(true)
 
             Button {
@@ -153,7 +167,7 @@ struct MemoryConstellationCanvasView: View {
             .buttonStyle(.plain)
             .position(x: midpoint.x, y: midpoint.y - (focused ? 28 : 10) - lift)
             .accessibilityLabel(Text(bridgeAccessibilityLabel(for: bridge, focused: focused)))
-            .accessibilityHint(Text(focused ? "Select to return to the constellation overview." : "Select to focus this bridge on the canvas."))
+            .accessibilityHint(Text(focused ? "点按可返回星图总览。" : "点按可在画布中聚焦这条连接。"))
         }
     }
 
@@ -167,12 +181,13 @@ struct MemoryConstellationCanvasView: View {
         let radius: CGFloat = focused ? 172 : 150
         let opacity = cluster.isDimmed ? 0.34 : 1.0
         let breath = reduceMotion ? 0 : MemoryConstellationMotion.clusterBreath(cluster: cluster.kind, phase: phase)
+        let pulseScale = 1 + (capturePulseProgress * (focused ? 0.08 : 0.05))
 
         return ZStack {
             Circle()
                 .fill(MemoryConstellationTheme.clusterGlow(for: cluster.kind, emphasis: cluster.emphasis))
                 .frame(width: radius * 2, height: radius * 2)
-                .scaleEffect(1 + breath)
+                .scaleEffect((1 + breath) * pulseScale)
                 .blur(radius: focused ? 10 : 18)
                 .accessibilityHidden(true)
 
@@ -194,6 +209,7 @@ struct MemoryConstellationCanvasView: View {
                             ? 1
                             : MemoryConstellationMotion.starScale(cluster: cluster.kind, starIndex: index, phase: phase)
                     )
+                    .scaleEffect(1 + (capturePulseProgress * 0.16))
                     .opacity(
                         reduceMotion
                             ? 0.88
@@ -213,7 +229,7 @@ struct MemoryConstellationCanvasView: View {
                 VStack(spacing: 6) {
                     Text(cluster.title)
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    Text("\(cluster.itemCount) stars")
+                    Text("\(cluster.itemCount) 个星点")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .tracking(1.0)
                         .textCase(.uppercase)
@@ -237,9 +253,9 @@ struct MemoryConstellationCanvasView: View {
                 hoverCluster(updatedFocus)
             }
             .opacity(opacity)
-            .accessibilityLabel(Text("\(cluster.title) cluster"))
-            .accessibilityValue(Text("\(cluster.itemCount) memories\(focused ? ", focused" : "")"))
-            .accessibilityHint(Text("Select to focus this cluster in the constellation."))
+            .accessibilityLabel(Text("\(cluster.title)星团"))
+            .accessibilityValue(Text("\(cluster.itemCount) 条记忆\(focused ? "，已聚焦" : "")"))
+            .accessibilityHint(Text("点按可聚焦这个星团。"))
         }
         .opacity(opacity)
     }
@@ -345,21 +361,38 @@ struct MemoryConstellationCanvasView: View {
         }
     }
 
+    @MainActor
+    private func playCapturePulseIfNeeded() async {
+        guard capturePulseToken > 0, !reduceMotion else {
+            return
+        }
+
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.60)) {
+            capturePulseProgress = 1
+        }
+
+        try? await Task.sleep(for: .milliseconds(420))
+
+        withAnimation(.easeOut(duration: 0.56)) {
+            capturePulseProgress = 0
+        }
+    }
+
     private func bridgeNarrative(for bridge: MemoryConstellationBridge) -> String {
         switch selectedViewMode {
         case .clusterMap:
-            return "Today’s bridge"
+            return "今日连接"
         case .bridgeStories:
-            return "Story focus"
+            return "关系焦点"
         case .timelineReplay:
-            return "Replay thread"
+            return "回放线索"
         }
     }
 
     private func bridgeAccessibilityLabel(for bridge: MemoryConstellationBridge, focused: Bool) -> String {
         let orderedTitles = orderedClusterTitles(for: bridge)
-        let focusState = focused ? "Focused. " : ""
-        return "\(focusState)\(bridge.label). \(bridgeNarrative(for: bridge)). Connects \(orderedTitles.0) and \(orderedTitles.1)."
+        let focusState = focused ? "已聚焦。" : ""
+        return "\(focusState)\(bridge.label)。\(bridgeNarrative(for: bridge))。连接\(orderedTitles.0)与\(orderedTitles.1)。"
     }
 
     private func orderedClusterTitles(for bridge: MemoryConstellationBridge) -> (String, String) {

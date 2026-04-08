@@ -22,8 +22,8 @@ struct MemoryConstellationAccessibilityTests {
             displayMode: .full
         )
 
-        #expect(snapshot.accessibilitySummary.contains("Main themes include Vocabulary, Style, and Scenes."))
-        #expect(snapshot.accessibilitySummary.contains("Strongest bridge connects Vocabulary and Style."))
+        #expect(snapshot.accessibilitySummary.contains("主要主题包括词汇、风格和场景。"))
+        #expect(snapshot.accessibilitySummary.contains("最强连接出现在词汇与风格之间。"))
     }
 
     @Test
@@ -43,9 +43,9 @@ struct MemoryConstellationAccessibilityTests {
             displayMode: .privacySafe
         )
 
-        #expect(snapshot.accessibilitySummary.contains("Protected memory constellation."))
-        #expect(snapshot.accessibilitySummary.contains("Main themes include Vocabulary, Style, and Scenes."))
-        #expect(snapshot.accessibilitySummary.contains("Strongest protected bridge connects Vocabulary and Style."))
+        #expect(snapshot.accessibilitySummary.contains("受保护的记忆星图。"))
+        #expect(snapshot.accessibilitySummary.contains("主要主题包括词汇、风格和场景。"))
+        #expect(snapshot.accessibilitySummary.contains("最强受保护连接出现在词汇与风格之间。"))
         #expect(snapshot.accessibilitySummary.localizedCaseInsensitiveContains("hera") == false)
         #expect(snapshot.accessibilitySummary.localizedCaseInsensitiveContains("customer-first") == false)
         #expect(snapshot.accessibilitySummary.localizedCaseInsensitiveContains("quarterly review") == false)
@@ -66,7 +66,7 @@ struct MemoryConstellationAccessibilityTests {
         )
 
         #expect(snapshot == .hidden)
-        #expect(snapshot.accessibilitySummary == "Memory visibility is hidden. No constellation is shown.")
+        #expect(snapshot.accessibilitySummary == "记忆可见性已隐藏。当前不显示星图。")
         #expect(snapshot.relationshipCards.isEmpty)
     }
 }

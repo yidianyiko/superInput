@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import MemoryDomain
+import SpeechBarDomain
 @testable import SpeechBarApp
 
 @Suite("MemoryConstellationStore")
@@ -19,7 +20,7 @@ struct MemoryConstellationStoreTests {
         await store.reload()
 
         #expect(store.snapshot.clusters.map(\.kind) == [.vocabulary, .style, .scenes])
-        #expect(store.snapshot.statusPills.contains("30 memories"))
+        #expect(store.snapshot.statusPills.contains("30 条记忆"))
         #expect(store.snapshot.clusters.reduce(0) { $0 + $1.itemCount } == 30)
     }
 
@@ -37,7 +38,7 @@ struct MemoryConstellationStoreTests {
         await store.reload()
 
         #expect(store.snapshot.clusters.contains(where: { $0.kind == .scenes }))
-        #expect(store.snapshot.statusPills.contains("30 memories"))
+        #expect(store.snapshot.statusPills.contains("30 条记忆"))
         #expect(store.snapshot.clusters.reduce(0) { $0 + $1.itemCount } == 30)
         #expect(store.snapshot.clusters.contains(where: { cluster in
             cluster.kind == .vocabulary && cluster.stars.contains(where: { $0.label == "OpenAI" })
@@ -58,7 +59,7 @@ struct MemoryConstellationStoreTests {
         await store.reload()
 
         #expect(store.snapshot.clusters.map(\.kind) == [.vocabulary])
-        #expect(store.snapshot.statusPills.contains("5 memories"))
+        #expect(store.snapshot.statusPills.contains("5 条记忆"))
     }
 
     @Test
@@ -77,7 +78,7 @@ struct MemoryConstellationStoreTests {
         store.hoverCluster(nil)
 
         #expect(store.focus == .overview)
-        #expect(store.snapshot.relationshipCards.first?.body.contains("Vocabulary") == true)
+        #expect(store.snapshot.relationshipCards.first?.body.contains("词汇") == true)
     }
 
     @Test
@@ -117,6 +118,31 @@ struct MemoryConstellationStoreTests {
         store.focusBridge(nil)
 
         #expect(store.focus == .overview)
+    }
+
+    @Test
+    @MainActor
+    func completedTranscriptPulseOnlyAdvancesForNewCompletions() {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.pulse.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let store = MemoryConstellationStore(
+            catalog: InlineCatalogProvider(memories: sampleMemories()),
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
+        let first = PublishedTranscript(text: "First", createdAt: Date(timeIntervalSince1970: 100))
+        let second = PublishedTranscript(text: "Second", createdAt: Date(timeIntervalSince1970: 101))
+
+        #expect(store.capturePulseToken == 0)
+
+        store.registerCompletedTranscriptPulse(first)
+        #expect(store.capturePulseToken == 1)
+
+        store.registerCompletedTranscriptPulse(first)
+        #expect(store.capturePulseToken == 1)
+
+        store.registerCompletedTranscriptPulse(second)
+        #expect(store.capturePulseToken == 2)
     }
 }
 

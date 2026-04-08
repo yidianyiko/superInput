@@ -48,11 +48,11 @@ enum MemoryConstellationTheme {
     static func displayModeLabel(_ mode: MemoryConstellationDisplayMode) -> String {
         switch mode {
         case .full:
-            return "Memory On"
+            return "完整显示"
         case .privacySafe:
-            return "Protected"
+            return "隐私保护"
         case .hidden:
-            return "Hidden"
+            return "隐藏"
         }
     }
 }

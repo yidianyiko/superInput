@@ -12,13 +12,13 @@ struct MemoryTimelineRibbonView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Timeline Replay")
+                        Text("时间回放")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .tracking(1.2)
                             .textCase(.uppercase)
                             .foregroundStyle(MemoryConstellationTheme.secondaryText)
 
-                        Text("Replay how clusters thicken and how bridges emerge over time.")
+                        Text("回放星团如何变密，以及连接如何随时间浮现。")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(MemoryConstellationTheme.secondaryText)
                     }
@@ -26,7 +26,7 @@ struct MemoryTimelineRibbonView: View {
                     Spacer()
 
                     MemoryConstellationChip(
-                        title: selectedViewMode == .timelineReplay ? "Replay Active" : "Enter Replay",
+                        title: selectedViewMode == .timelineReplay ? "回放中" : "进入回放",
                         isSelected: selectedViewMode == .timelineReplay
                     ) {
                         selectViewMode(
@@ -38,7 +38,7 @@ struct MemoryTimelineRibbonView: View {
                 }
 
                 if timeline.windows.isEmpty {
-                    Text("The ribbon is waiting for enough memory history to show a meaningful formation replay.")
+                    Text("当前记忆历史还不够，暂时无法展示有意义的形成回放。")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(MemoryConstellationTheme.secondaryText)
                 } else {
@@ -53,7 +53,7 @@ struct MemoryTimelineRibbonView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(window.title)
                                         .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                    Text("\(window.memoryCount) memories")
+                                    Text("\(window.memoryCount) 条记忆")
                                         .font(.system(size: 11, weight: .medium))
                                 }
                                 .foregroundStyle(MemoryConstellationTheme.primaryText)

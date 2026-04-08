@@ -9,7 +9,7 @@ struct MemoryConstellationHeaderView: View {
         MemoryConstellationPanel(padding: 22) {
             HStack(alignment: .top, spacing: 18) {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Memory Constellation")
+                    Text("记忆星图")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .tracking(1.6)
                         .textCase(.uppercase)
@@ -35,7 +35,7 @@ struct MemoryConstellationHeaderView: View {
                 Spacer(minLength: 12)
 
                 VStack(alignment: .trailing, spacing: 12) {
-                    Picker("Visibility", selection: $memoryFeatureFlagStore.displayMode) {
+                    Picker("显示模式", selection: $memoryFeatureFlagStore.displayMode) {
                         ForEach(MemoryConstellationDisplayMode.allCases, id: \.self) { mode in
                             Text(MemoryConstellationTheme.displayModeLabel(mode)).tag(mode)
                         }
@@ -48,8 +48,8 @@ struct MemoryConstellationHeaderView: View {
                     }
 
                     HStack(spacing: 8) {
-                        statusPill(title: memoryFeatureFlagStore.captureEnabled ? "Capture On" : "Capture Off")
-                        statusPill(title: memoryFeatureFlagStore.recallEnabled ? "Recall On" : "Recall Off")
+                        statusPill(title: memoryFeatureFlagStore.captureEnabled ? "采集开启" : "采集关闭")
+                        statusPill(title: memoryFeatureFlagStore.recallEnabled ? "召回开启" : "召回关闭")
                     }
                 }
             }
@@ -58,7 +58,7 @@ struct MemoryConstellationHeaderView: View {
 
     private var headerTags: [String] {
         snapshot.statusPills + [
-            "\(snapshot.clusters.reduce(0) { $0 + $1.itemCount }) memories"
+            "\(snapshot.clusters.reduce(0) { $0 + $1.itemCount }) 条记忆"
         ]
     }
 

@@ -35,20 +35,20 @@ struct MemoryConstellationBuilder {
         let guidanceCards = buildGuidanceCards(bridges: bridges)
         let subtitle = switch viewMode {
         case .clusterMap:
-            "Cluster mass first, then the bridge that matters now."
+            "先看星团密度，再看此刻最值得关注的连接。"
         case .bridgeStories:
-            "Read the strongest cross-theme relationships first."
+            "优先阅读跨主题之间最强的关系。"
         case .timelineReplay:
-            "Replay how memory density changes across recent windows."
+            "回放最近时间窗口里的记忆密度变化。"
         }
 
         return MemoryConstellationSnapshot(
-            title: "My Universe",
+            title: "我的记忆宇宙",
             subtitle: subtitle,
             statusPills: [
-                "30d local retention",
-                "\(active.count) memories",
-                displayMode == .privacySafe ? "Private View" : "Memory On"
+                "本地保留 30 天",
+                "\(active.count) 条记忆",
+                displayMode == .privacySafe ? "隐私视图" : "记忆已开启"
             ],
             clusters: clusters,
             highlightedBridges: Array(bridges.prefix(2)),
@@ -133,7 +133,7 @@ struct MemoryConstellationBuilder {
                     from: clusters[0],
                     to: clusters[1],
                     strength: pair.value,
-                    label: displayMode == .privacySafe ? "Protected relationship" : "Today's bridge",
+                    label: displayMode == .privacySafe ? "受保护连接" : "今日连接",
                     isFocused: isFocused
                 )
             }
@@ -156,7 +156,7 @@ struct MemoryConstellationBuilder {
             .map { memory in
                 MemoryConstellationStar(
                     id: memory.id,
-                    label: displayMode == .privacySafe ? "Protected memory" : memory.valueFingerprint,
+                    label: displayMode == .privacySafe ? "受保护记忆" : memory.valueFingerprint,
                     strength: memory.confidence
                 )
             }
@@ -190,14 +190,14 @@ struct MemoryConstellationBuilder {
                 MemoryConstellationRelationshipCard(
                     id: UUID(),
                     bridgeID: nil,
-                    title: "Emerging Themes",
+                    title: "正在形成的主题",
                     body: displayMode == .privacySafe
-                        ? "Protected themes are forming, but no strong bridge is visible yet."
-                        : "Themes are present, but no single bridge stands out yet.",
+                        ? "受保护的主题正在形成，但暂时还没有明显的强连接。"
+                        : "主题轮廓已经出现，但还没有哪条连接特别突出。",
                     accessibilityLabel: displayMode == .privacySafe
-                        ? "Emerging Themes. Protected themes are forming, but no strong bridge is visible yet."
-                        : "Emerging Themes. Themes are present, but no single bridge stands out yet.",
-                    accessibilityHint: "Select to return to the constellation overview."
+                        ? "正在形成的主题。受保护的主题正在形成，但暂时还没有明显的强连接。"
+                        : "正在形成的主题。主题轮廓已经出现，但还没有哪条连接特别突出。",
+                    accessibilityHint: "点按可返回星图总览。"
                 )
             ]
         }
@@ -207,24 +207,24 @@ struct MemoryConstellationBuilder {
             let title: String
             switch index {
             case 0:
-                title = "Strongest Now"
+                title = "当前最强"
             case 1:
-                title = "Rising Bridge"
+                title = "正在升温"
             default:
-                title = "Subtle Link"
+                title = "隐约关联"
             }
 
             let body: String
             if displayMode == .privacySafe {
-                body = "Protected relationship connecting \(orderedThemes.0) and \(orderedThemes.1)."
+                body = "一条受保护的连接正在串联\(orderedThemes.0)与\(orderedThemes.1)。"
             } else {
-                body = "\(orderedThemes.0) is currently reinforcing \(orderedThemes.1)."
+                body = "\(orderedThemes.0) 当前正在强化 \(orderedThemes.1)。"
             }
 
             let accessibilityLabel = "\(title). \(body)"
             let accessibilityHint = bridge.isFocused
-                ? "Select to return to the constellation overview."
-                : "Select to focus this bridge on the canvas."
+                ? "点按可返回星图总览。"
+                : "点按可在画布中聚焦这条连接。"
 
             return MemoryConstellationRelationshipCard(
                 id: UUID(),
@@ -242,13 +242,13 @@ struct MemoryConstellationBuilder {
             return [
                 MemoryConstellationGuidanceCard(
                     id: UUID(),
-                    title: "Today's Bridge",
-                    body: "\(bridge.from.title) is the clearest cross-theme relationship right now."
+                    title: "今日连接",
+                    body: "\(bridge.from.title) 是当前最清晰的跨主题关联。"
                 ),
                 MemoryConstellationGuidanceCard(
                     id: UUID(),
-                    title: "Reading Cue",
-                    body: "Hover a cluster before drilling into individual stars."
+                    title: "阅读提示",
+                    body: "先悬停星团，再继续查看具体星点。"
                 )
             ]
         }
@@ -256,13 +256,13 @@ struct MemoryConstellationBuilder {
         return [
             MemoryConstellationGuidanceCard(
                 id: UUID(),
-                title: "Emerging Themes",
-                body: "Cluster mass is visible, but the strongest bridge is still forming."
+                title: "正在形成的主题",
+                body: "星团轮廓已经出现，但最强连接仍在形成。"
             ),
             MemoryConstellationGuidanceCard(
                 id: UUID(),
-                title: "Reading Cue",
-                body: "Start with the largest cluster and then inspect smaller satellites."
+                title: "阅读提示",
+                body: "先看最大的星团，再观察较小的卫星点。"
             )
         ]
     }
@@ -270,9 +270,9 @@ struct MemoryConstellationBuilder {
     private func buildTimeline(from memories: [MemoryItem]) -> MemoryConstellationTimeline {
         let nowDate = now()
         let windows = [
-            ("24h", "Today", memories.filter { nowDate.timeIntervalSince($0.updatedAt) <= 24 * 60 * 60 }.count),
-            ("7d", "7 Days", memories.filter { nowDate.timeIntervalSince($0.updatedAt) <= 7 * 24 * 60 * 60 }.count),
-            ("30d", "30 Days", memories.count)
+            ("24h", "今天", memories.filter { nowDate.timeIntervalSince($0.updatedAt) <= 24 * 60 * 60 }.count),
+            ("7d", "近 7 天", memories.filter { nowDate.timeIntervalSince($0.updatedAt) <= 7 * 24 * 60 * 60 }.count),
+            ("30d", "近 30 天", memories.count)
         ]
 
         return MemoryConstellationTimeline(
@@ -295,45 +295,45 @@ struct MemoryConstellationBuilder {
 
         switch displayMode {
         case .hidden:
-            return "Memory visibility is hidden. No constellation is shown."
+            return "记忆可见性已隐藏。当前不显示星图。"
         case .privacySafe:
-            let prefix = "Protected memory constellation."
+            let prefix = "受保护的记忆星图。"
             if let bridge = bridges.first {
                 let orderedThemes = orderedThemeTitles(for: bridge)
-                return [prefix, themesSummary, "Strongest protected bridge connects \(orderedThemes.0) and \(orderedThemes.1)."]
+                return [prefix, themesSummary, "最强受保护连接出现在\(orderedThemes.0)与\(orderedThemes.1)之间。"]
                     .compactMap { $0 }
                     .joined(separator: " ")
             }
             if let themesSummary {
-                return "\(prefix) \(themesSummary) No strong protected bridge is active today."
+                return "\(prefix) \(themesSummary) 今天还没有明显的受保护强连接。"
             }
-            return "\(prefix) No themes are visible yet."
+            return "\(prefix) 目前还没有可见主题。"
         case .full:
             if let bridge = bridges.first {
                 let orderedThemes = orderedThemeTitles(for: bridge)
                 return [
-                    "Memory constellation ready.",
+                    "记忆星图已就绪。",
                     themesSummary,
-                    "Strongest bridge connects \(orderedThemes.0) and \(orderedThemes.1)."
+                    "最强连接出现在\(orderedThemes.0)与\(orderedThemes.1)之间。"
                 ]
                 .compactMap { $0 }
                 .joined(separator: " ")
             }
             if let themesSummary {
-                return "Memory constellation ready. \(themesSummary) No strong bridge is active today."
+                return "记忆星图已就绪。\(themesSummary) 今天还没有明显的强连接。"
             }
-            return "Memory constellation ready. No themes are visible yet."
+            return "记忆星图已就绪。当前还没有可见主题。"
         }
     }
 
     private func buildAccessibilityHint(displayMode: MemoryConstellationDisplayMode) -> String {
         switch displayMode {
         case .hidden:
-            return "Enable memory visibility to restore constellation content."
+            return "开启记忆可见性以恢复星图内容。"
         case .privacySafe:
-            return "Use the cluster and relationship controls to explore themes without exposing protected memory terms."
+            return "使用星团和关系控件探索主题，同时避免暴露受保护的记忆词条。"
         case .full:
-            return "Use the cluster and relationship controls to explore the main themes and strongest bridges."
+            return "使用星团和关系控件探索主要主题与最强连接。"
         }
     }
 
@@ -344,7 +344,7 @@ struct MemoryConstellationBuilder {
         guard titles.isEmpty == false else {
             return nil
         }
-        return "Main themes include \(naturalLanguageList(titles))."
+        return "主要主题包括\(naturalLanguageList(titles))。"
     }
 
     private func orderedThemeTitles(for bridge: MemoryConstellationBridge) -> (String, String) {
@@ -365,10 +365,10 @@ struct MemoryConstellationBuilder {
         case 1:
             return items[0]
         case 2:
-            return "\(items[0]) and \(items[1])"
+            return "\(items[0])和\(items[1])"
         default:
-            let prefix = items.dropLast().joined(separator: ", ")
-            return "\(prefix), and \(items.last!)"
+            let prefix = items.dropLast().joined(separator: "、")
+            return "\(prefix)和\(items.last!)"
         }
     }
 

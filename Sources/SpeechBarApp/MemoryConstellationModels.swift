@@ -10,11 +10,11 @@ enum MemoryConstellationClusterKind: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .vocabulary:
-            return "Vocabulary"
+            return "词汇"
         case .style:
-            return "Style"
+            return "风格"
         case .scenes:
-            return "Scenes"
+            return "场景"
         }
     }
 }
@@ -29,9 +29,9 @@ enum MemoryConstellationClusterFilter: String, CaseIterable, Identifiable {
 }
 
 enum MemoryConstellationViewMode: String, CaseIterable, Identifiable {
-    case clusterMap = "Cluster Map"
-    case bridgeStories = "Bridge Stories"
-    case timelineReplay = "Timeline Replay"
+    case clusterMap = "星团总览"
+    case bridgeStories = "关系解读"
+    case timelineReplay = "时间回放"
 
     var id: String { rawValue }
 }
@@ -62,16 +62,16 @@ struct MemoryConstellationSnapshot: Equatable {
     let accessibilityHint: String
 
     static let hidden = MemoryConstellationSnapshot(
-        title: "My Universe",
-        subtitle: "Memory visibility is hidden.",
-        statusPills: ["Hidden"],
+        title: "我的记忆宇宙",
+        subtitle: "记忆可见性已隐藏。",
+        statusPills: ["已隐藏"],
         clusters: [],
         highlightedBridges: [],
         guidanceCards: [],
         relationshipCards: [],
         timeline: .empty,
-        accessibilitySummary: "Memory visibility is hidden. No constellation is shown.",
-        accessibilityHint: "Enable memory visibility to restore constellation content."
+        accessibilitySummary: "记忆可见性已隐藏。当前不显示星图。",
+        accessibilityHint: "开启记忆可见性以恢复星图内容。"
     )
 }
 

@@ -7,14 +7,14 @@ struct MemoryConstellationRelationshipTrayView: View {
     var body: some View {
         MemoryConstellationPanel(padding: 18) {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Relationship Tray")
+                Text("关系解读")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .tracking(1.2)
                     .textCase(.uppercase)
                     .foregroundStyle(MemoryConstellationTheme.secondaryText)
 
                 if cards.isEmpty {
-                    Text("No bridge story is dominant yet. The sky will stay quiet until a stronger pattern forms.")
+                    Text("当前还没有哪条关系特别突出，等更强的模式形成后这里会更清晰。")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(MemoryConstellationTheme.secondaryText)
                 } else {
@@ -36,7 +36,7 @@ struct MemoryConstellationRelationshipTrayView: View {
 
                                     Spacer(minLength: 0)
 
-                                    Text(card.bridgeID == nil ? "Overview" : "Focus Bridge")
+                                    Text(card.bridgeID == nil ? "返回总览" : "聚焦连接")
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
                                         .foregroundStyle(MemoryConstellationTheme.focusGold)
                                 }

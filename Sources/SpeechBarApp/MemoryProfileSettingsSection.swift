@@ -23,10 +23,10 @@ struct MemoryProfileSettingsSection: View {
         } label: {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Secondary Memory Controls")
+                    Text("辅助记忆控制")
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
                         .foregroundStyle(MemoryConstellationTheme.primaryText)
-                    Text("Keep the manual profile, recall, and glossary controls close at hand without overpowering the constellation.")
+                    Text("把手动背景、记忆召回和术语词表放在这里，方便调整，同时不打断星图阅读。")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(MemoryConstellationTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -34,7 +34,7 @@ struct MemoryProfileSettingsSection: View {
 
                 Spacer()
 
-                Text(isExpanded ? "Hide" : "Show")
+                Text(isExpanded ? "收起" : "展开")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(MemoryConstellationTheme.focusGold)
             }

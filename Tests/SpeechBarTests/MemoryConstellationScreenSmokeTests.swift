@@ -33,7 +33,8 @@ struct MemoryConstellationScreenSmokeTests {
         let rootView = MemoryConstellationScreen(
             constellationStore: constellationStore,
             userProfileStore: userProfileStore,
-            memoryFeatureFlagStore: featureFlags
+            memoryFeatureFlagStore: featureFlags,
+            completedTranscript: nil
         )
         let hostingView = NSHostingView(rootView: rootView.frame(width: 980, height: 860))
 
@@ -41,7 +42,7 @@ struct MemoryConstellationScreenSmokeTests {
 
         #expect(hostingView.fittingSize.width > 0)
         #expect(hostingView.fittingSize.height > 0)
-        #expect(constellationStore.snapshot.title == "My Universe")
+        #expect(constellationStore.snapshot.title == "我的记忆宇宙")
         #expect(constellationStore.snapshot.clusters.isEmpty == false)
     }
 

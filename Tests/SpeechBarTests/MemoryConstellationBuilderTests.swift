@@ -39,8 +39,8 @@ struct MemoryConstellationBuilderTests {
             displayMode: .privacySafe
         )
 
-        #expect(snapshot.clusters[0].stars[0].label == "Protected memory")
-        #expect(snapshot.relationshipCards[0].body.lowercased().contains("protected"))
+        #expect(snapshot.clusters[0].stars[0].label == "受保护记忆")
+        #expect(snapshot.relationshipCards[0].body.contains("受保护"))
     }
 
     @Test
@@ -59,7 +59,7 @@ struct MemoryConstellationBuilderTests {
         )
 
         #expect(snapshot.highlightedBridges.isEmpty)
-        #expect(snapshot.guidanceCards.contains { $0.title == "Emerging Themes" })
+        #expect(snapshot.guidanceCards.contains { $0.title == "正在形成的主题" })
     }
 
     @Test
