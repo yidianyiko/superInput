@@ -22,39 +22,42 @@ struct MemoryConstellationCanvasView: View {
         MemoryConstellationPanel(padding: 16) {
             GeometryReader { proxy in
                 let size = proxy.size
+                TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: reduceMotion)) { context in
+                    let phase = context.date.timeIntervalSinceReferenceDate
 
-                ZStack {
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(MemoryConstellationTheme.canvasBackground)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .fill(MemoryConstellationTheme.canvasBackground)
 
-                    ambientGrid(size: size)
+                        ambientGrid(size: size, phase: phase)
 
-                    ForEach(snapshot.highlightedBridges) { bridge in
-                        bridgeLayer(bridge, size: size)
-                    }
+                        ForEach(Array(snapshot.highlightedBridges.enumerated()), id: \.element.id) { index, bridge in
+                            bridgeLayer(bridge, bridgeIndex: index, size: size, phase: phase)
+                        }
 
-                    ForEach(snapshot.clusters) { cluster in
-                        clusterLayer(cluster, size: size)
-                    }
+                        ForEach(snapshot.clusters) { cluster in
+                            clusterLayer(cluster, size: size, phase: phase)
+                        }
 
-                    VStack {
-                        HStack(alignment: .top, spacing: 10) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                ForEach(snapshot.guidanceCards) { card in
-                                    guidanceCard(card)
+                        VStack {
+                            HStack(alignment: .top, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    ForEach(snapshot.guidanceCards) { card in
+                                        guidanceCard(card)
+                                    }
                                 }
+                                Spacer()
                             }
                             Spacer()
                         }
-                        Spacer()
+                        .padding(18)
                     }
-                    .padding(18)
+                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                )
             }
             .frame(minHeight: 470)
         }
@@ -73,11 +76,11 @@ struct MemoryConstellationCanvasView: View {
         }
     }
 
-    private func ambientGrid(size: CGSize) -> some View {
+    private func ambientGrid(size: CGSize, phase: TimeInterval) -> some View {
         ZStack {
             ForEach(0..<24, id: \.self) { index in
                 Circle()
-                    .fill(Color.white.opacity(index.isMultiple(of: 5) ? 0.22 : 0.10))
+                    .fill(Color.white.opacity(MemoryConstellationMotion.ambientOpacity(index: index, phase: phase)))
                     .frame(width: index.isMultiple(of: 4) ? 4 : 2, height: index.isMultiple(of: 4) ? 4 : 2)
                     .position(
                         x: size.width * ambientX(for: index),
@@ -88,11 +91,17 @@ struct MemoryConstellationCanvasView: View {
         .accessibilityHidden(true)
     }
 
-    private func bridgeLayer(_ bridge: MemoryConstellationBridge, size: CGSize) -> some View {
+    private func bridgeLayer(
+        _ bridge: MemoryConstellationBridge,
+        bridgeIndex: Int,
+        size: CGSize,
+        phase: TimeInterval
+    ) -> some View {
         let from = point(for: bridge.from, size: size)
         let to = point(for: bridge.to, size: size)
         let midpoint = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
         let focused = bridge.isFocused || focus == .bridge(bridge.id)
+        let lift = reduceMotion ? 0 : MemoryConstellationMotion.bridgeLift(bridgeIndex: bridgeIndex, phase: phase)
 
         return ZStack {
             Path { path in
@@ -101,7 +110,7 @@ struct MemoryConstellationCanvasView: View {
                     to: to,
                     control: CGPoint(
                         x: midpoint.x,
-                        y: min(from.y, to.y) - (focused ? 84 : 54)
+                        y: min(from.y, to.y) - (focused ? 84 : 54) - (lift * 0.5)
                     )
                 )
             }
@@ -114,9 +123,9 @@ struct MemoryConstellationCanvasView: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
-                style: StrokeStyle(lineWidth: focused ? 4 : 2, lineCap: .round, dash: focused ? [] : [8, 8])
+                style: StrokeStyle(lineWidth: (focused ? 4 : 2) + (lift * 0.05), lineCap: .round, dash: focused ? [] : [8, 8])
             )
-            .shadow(color: MemoryConstellationTheme.accentGold.opacity(focused ? 0.42 : 0.18), radius: focused ? 10 : 4)
+            .shadow(color: MemoryConstellationTheme.accentGold.opacity(focused ? 0.42 : 0.18), radius: (focused ? 10 : 4) + (lift * 0.18))
             .accessibilityHidden(true)
 
             Button {
@@ -142,22 +151,28 @@ struct MemoryConstellationCanvasView: View {
                 )
             }
             .buttonStyle(.plain)
-            .position(x: midpoint.x, y: midpoint.y - (focused ? 28 : 10))
+            .position(x: midpoint.x, y: midpoint.y - (focused ? 28 : 10) - lift)
             .accessibilityLabel(Text(bridgeAccessibilityLabel(for: bridge, focused: focused)))
             .accessibilityHint(Text(focused ? "Select to return to the constellation overview." : "Select to focus this bridge on the canvas."))
         }
     }
 
-    private func clusterLayer(_ cluster: MemoryConstellationCluster, size: CGSize) -> some View {
+    private func clusterLayer(
+        _ cluster: MemoryConstellationCluster,
+        size: CGSize,
+        phase: TimeInterval
+    ) -> some View {
         let anchor = point(for: cluster.kind, size: size)
         let focused = isClusterFocused(cluster.kind)
         let radius: CGFloat = focused ? 172 : 150
         let opacity = cluster.isDimmed ? 0.34 : 1.0
+        let breath = reduceMotion ? 0 : MemoryConstellationMotion.clusterBreath(cluster: cluster.kind, phase: phase)
 
         return ZStack {
             Circle()
                 .fill(MemoryConstellationTheme.clusterGlow(for: cluster.kind, emphasis: cluster.emphasis))
                 .frame(width: radius * 2, height: radius * 2)
+                .scaleEffect(1 + breath)
                 .blur(radius: focused ? 10 : 18)
                 .accessibilityHidden(true)
 
@@ -167,11 +182,27 @@ struct MemoryConstellationCanvasView: View {
                 .accessibilityHidden(true)
 
             ForEach(Array(cluster.stars.enumerated()), id: \.element.id) { index, star in
+                let starOffset = reduceMotion
+                    ? .zero
+                    : MemoryConstellationMotion.starOffset(cluster: cluster.kind, starIndex: index, phase: phase)
                 Circle()
                     .fill(starColor(for: cluster.kind, focused: focused))
                     .frame(width: starDiameter(star), height: starDiameter(star))
                     .shadow(color: Color.white.opacity(focused ? 0.32 : 0.18), radius: focused ? 7 : 3)
-                    .position(starPosition(index: index, around: anchor, radius: radius * 0.50))
+                    .scaleEffect(
+                        reduceMotion
+                            ? 1
+                            : MemoryConstellationMotion.starScale(cluster: cluster.kind, starIndex: index, phase: phase)
+                    )
+                    .opacity(
+                        reduceMotion
+                            ? 0.88
+                            : MemoryConstellationMotion.starOpacity(cluster: cluster.kind, starIndex: index, phase: phase)
+                    )
+                    .position(
+                        x: starPosition(index: index, around: anchor, radius: radius * 0.50).x + starOffset.width,
+                        y: starPosition(index: index, around: anchor, radius: radius * 0.50).y + starOffset.height
+                    )
                     .accessibilityHidden(true)
             }
 

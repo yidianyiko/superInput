@@ -48,48 +48,43 @@ enum MemoryConstellationFixtures {
     }
 
     static func defaultMemories(now: Date) -> [MemoryItem] {
-        [
-            makeMemory(
-                id: uuid("11111111-1111-4111-8111-111111111111"),
-                type: .vocabulary,
-                key: "vocabulary:openai",
-                fingerprint: "OpenAI",
-                identityHash: "vocabulary|openai",
-                confidence: 0.92,
-                updatedAt: now.addingTimeInterval(-5),
-                sourceEventIDs: [uuid("aaaaaaa1-0000-4000-8000-000000000001")]
-            ),
-            makeMemory(
-                id: uuid("22222222-2222-4222-8222-222222222222"),
-                type: .style,
-                key: "style:brevity",
-                fingerprint: "Brevity first",
-                identityHash: "style|brevity",
-                confidence: 0.87,
-                updatedAt: now.addingTimeInterval(-4),
-                sourceEventIDs: [uuid("aaaaaaa1-0000-4000-8000-000000000001"), uuid("aaaaaaa2-0000-4000-8000-000000000002")]
-            ),
-            makeMemory(
-                id: uuid("33333333-3333-4333-8333-333333333333"),
-                type: .scene,
-                key: "scene:review",
-                fingerprint: "Weekly review",
-                identityHash: "scene|review",
-                confidence: 0.78,
-                updatedAt: now.addingTimeInterval(-8),
-                sourceEventIDs: [uuid("aaaaaaa2-0000-4000-8000-000000000002")]
-            ),
-            makeMemory(
-                id: uuid("44444444-4444-4444-8444-444444444444"),
-                type: .vocabulary,
-                key: "vocabulary:roadmap",
-                fingerprint: "Roadmap",
-                identityHash: "vocabulary|roadmap",
-                confidence: 0.80,
-                updatedAt: now.addingTimeInterval(-11),
-                sourceEventIDs: [uuid("aaaaaaa3-0000-4000-8000-000000000003")]
-            )
-        ]
+        demoThreads.enumerated().flatMap { index, thread in
+            let eventID = demoEventID(index + 1)
+            let threadBaseOffset = TimeInterval(index * 540)
+
+            return [
+                makeMemory(
+                    id: demoMemoryID(index * 3 + 1),
+                    type: .vocabulary,
+                    key: "vocabulary:\(thread.vocabularySlug)",
+                    fingerprint: thread.vocabulary,
+                    identityHash: "vocabulary|\(thread.vocabularySlug)",
+                    confidence: max(0.72, 0.92 - (Double(index) * 0.018)),
+                    updatedAt: now.addingTimeInterval(-(threadBaseOffset + 5)),
+                    sourceEventIDs: [eventID]
+                ),
+                makeMemory(
+                    id: demoMemoryID(index * 3 + 2),
+                    type: .style,
+                    key: "style:\(thread.styleSlug)",
+                    fingerprint: thread.style,
+                    identityHash: "style|\(thread.styleSlug)",
+                    confidence: max(0.70, 0.88 - (Double(index) * 0.017)),
+                    updatedAt: now.addingTimeInterval(-(threadBaseOffset + 9)),
+                    sourceEventIDs: [eventID]
+                ),
+                makeMemory(
+                    id: demoMemoryID(index * 3 + 3),
+                    type: .scene,
+                    key: "scene:\(thread.sceneSlug)",
+                    fingerprint: thread.scene,
+                    identityHash: "scene|\(thread.sceneSlug)",
+                    confidence: max(0.68, 0.84 - (Double(index) * 0.016)),
+                    updatedAt: now.addingTimeInterval(-(threadBaseOffset + 16)),
+                    sourceEventIDs: [eventID]
+                )
+            ]
+        }
     }
 
     static func sparseMemories(now: Date) -> [MemoryItem] {
@@ -272,6 +267,34 @@ enum MemoryConstellationFixtures {
     private static func uuid(_ string: String) -> UUID {
         UUID(uuidString: string)!
     }
+
+    private static func demoMemoryID(_ seed: Int) -> UUID {
+        UUID(uuidString: String(format: "%08d-0000-4000-8000-%012d", seed, seed))!
+    }
+
+    private static func demoEventID(_ seed: Int) -> UUID {
+        UUID(uuidString: String(format: "%08d-0000-4000-9000-%012d", seed, seed))!
+    }
+
+    private static let demoThreads: [(
+        vocabulary: String,
+        vocabularySlug: String,
+        style: String,
+        styleSlug: String,
+        scene: String,
+        sceneSlug: String
+    )] = [
+        ("OpenAI", "openai", "Brevity first", "brevity", "Weekly review", "review"),
+        ("Roadmap", "roadmap", "Decision first", "decision-first", "Launch checklist", "launch-checklist"),
+        ("Prompt engineering", "prompt-engineering", "Clear next steps", "clear-next-steps", "Hackathon demo", "hackathon-demo"),
+        ("Retrieval", "retrieval", "Concrete examples", "concrete-examples", "Customer follow-up", "customer-follow-up"),
+        ("Transcript cleanup", "transcript-cleanup", "No fluff", "no-fluff", "QA triage", "qa-triage"),
+        ("Memory recall", "memory-recall", "Calm confidence", "calm-confidence", "Investor sync", "investor-sync"),
+        ("Evaluation harness", "evaluation-harness", "Structured bullets", "structured-bullets", "Product spec", "product-spec"),
+        ("Model routing", "model-routing", "Simple Chinese", "simple-chinese", "Morning standup", "morning-standup"),
+        ("Latency budget", "latency-budget", "Action first", "action-first", "Bug bash", "bug-bash"),
+        ("Personal notes", "personal-notes", "Warm but direct", "warm-but-direct", "Founder update", "founder-update")
+    ]
 }
 
 struct StaticMemoryCatalogProvider: MemoryCatalogProviding, Sendable {

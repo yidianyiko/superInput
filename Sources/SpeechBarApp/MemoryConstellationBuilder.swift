@@ -152,7 +152,7 @@ struct MemoryConstellationBuilder {
                 }
                 return lhs.updatedAt > rhs.updatedAt
             }
-            .prefix(8)
+            .prefix(10)
             .map { memory in
                 MemoryConstellationStar(
                     id: memory.id,

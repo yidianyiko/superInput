@@ -61,6 +61,29 @@ struct MemoryConstellationBuilderTests {
         #expect(snapshot.highlightedBridges.isEmpty)
         #expect(snapshot.guidanceCards.contains { $0.title == "Emerging Themes" })
     }
+
+    @Test
+    func denseClustersExposeUpToTenVisibleStars() {
+        let builder = MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        let sharedEvent = UUID()
+
+        let snapshot = builder.build(
+            memories: (0..<12).map { index in
+                makeMemory(
+                    type: .vocabulary,
+                    payload: "Dense \(index)",
+                    updatedAt: 100 - Double(index),
+                    eventIDs: [sharedEvent]
+                )
+            },
+            filter: .all,
+            focus: .overview,
+            viewMode: .clusterMap,
+            displayMode: .full
+        )
+
+        #expect(snapshot.clusters.first(where: { $0.kind == .vocabulary })?.stars.count == 10)
+    }
 }
 
 private func makeMemory(

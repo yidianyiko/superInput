@@ -19,7 +19,8 @@ struct MemoryConstellationStoreTests {
         await store.reload()
 
         #expect(store.snapshot.clusters.map(\.kind) == [.vocabulary, .style, .scenes])
-        #expect(store.snapshot.statusPills.contains("4 memories"))
+        #expect(store.snapshot.statusPills.contains("30 memories"))
+        #expect(store.snapshot.clusters.reduce(0) { $0 + $1.itemCount } == 30)
     }
 
     @Test
@@ -36,7 +37,8 @@ struct MemoryConstellationStoreTests {
         await store.reload()
 
         #expect(store.snapshot.clusters.contains(where: { $0.kind == .scenes }))
-        #expect(store.snapshot.statusPills.contains("5 memories"))
+        #expect(store.snapshot.statusPills.contains("30 memories"))
+        #expect(store.snapshot.clusters.reduce(0) { $0 + $1.itemCount } == 30)
         #expect(store.snapshot.clusters.contains(where: { cluster in
             cluster.kind == .vocabulary && cluster.stars.contains(where: { $0.label == "OpenAI" })
         }))

@@ -14,6 +14,7 @@ final class MemoryConstellationStore: ObservableObject {
     private let featureFlags: MemoryFeatureFlagStore
     private let builder: MemoryConstellationBuilder
     private var memories: [MemoryItem] = []
+    private let demoPresentationMemoryCount = 30
     private let minimumLiveMemoryCountForRealOnlyPresentation = 5
 
     init(
@@ -94,10 +95,10 @@ final class MemoryConstellationStore: ObservableObject {
 
         let now = builder.now()
         guard !liveMemories.isEmpty else {
-            return MemoryConstellationFixtures.defaultMemories(now: now)
+            return Array(MemoryConstellationFixtures.defaultMemories(now: now).prefix(demoPresentationMemoryCount))
         }
 
-        let neededSupplementCount = minimumLiveMemoryCountForRealOnlyPresentation - liveMemories.count
+        let neededSupplementCount = max(demoPresentationMemoryCount - liveMemories.count, 0)
         let representedKinds = Set(liveMemories.map(clusterKind(for:)))
         let seenIdentityHashes = Set(liveMemories.map(\.identityHash))
 
