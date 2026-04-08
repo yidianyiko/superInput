@@ -14,6 +14,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
     private let audioInputSettingsStore: AudioInputSettingsStore
     private let localWhisperModelStore: LocalWhisperModelStore
     private let senseVoiceModelStore: SenseVoiceModelStore
+    private let memoryFeatureFlagStore: MemoryFeatureFlagStore
 
     init(
         coordinator: VoiceSessionCoordinator,
@@ -25,7 +26,8 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         audioInputSettingsStore: AudioInputSettingsStore,
         modelSettingsStore: OpenAIModelSettingsStore,
         localWhisperModelStore: LocalWhisperModelStore,
-        senseVoiceModelStore: SenseVoiceModelStore
+        senseVoiceModelStore: SenseVoiceModelStore,
+        memoryFeatureFlagStore: MemoryFeatureFlagStore
     ) {
         self.store = HomeWindowStore(coordinator: coordinator)
         self.agentMonitorCoordinator = agentMonitorCoordinator
@@ -36,6 +38,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         self.audioInputSettingsStore = audioInputSettingsStore
         self.localWhisperModelStore = localWhisperModelStore
         self.senseVoiceModelStore = senseVoiceModelStore
+        self.memoryFeatureFlagStore = memoryFeatureFlagStore
         let hostingController = NSHostingController(
             rootView: HomeWindowView(
                 coordinator: coordinator,
@@ -48,6 +51,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
                 modelSettingsStore: modelSettingsStore,
                 localWhisperModelStore: localWhisperModelStore,
                 senseVoiceModelStore: senseVoiceModelStore,
+                memoryFeatureFlagStore: memoryFeatureFlagStore,
                 pushToTalkSource: pushToTalkSource
             )
         )
