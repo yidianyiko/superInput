@@ -7,9 +7,9 @@ import SwiftUI
 
 struct HomeWindowView: View {
     @ObservedObject var coordinator: VoiceSessionCoordinator
-    @ObservedObject var agentMonitorCoordinator: AgentMonitorCoordinator
-    @ObservedObject var embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
-    @ObservedObject var diagnosticsCoordinator: DiagnosticsCoordinator
+    let agentMonitorCoordinator: AgentMonitorCoordinator
+    let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
+    let diagnosticsCoordinator: DiagnosticsCoordinator
     @ObservedObject var store: HomeWindowStore
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var audioInputSettingsStore: AudioInputSettingsStore
@@ -20,13 +20,49 @@ struct HomeWindowView: View {
     @ObservedObject var memoryConstellationStore: MemoryConstellationStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
     let pushToTalkSource: OnScreenPushToTalkSource
+    let bodyEvaluationProbe: (() -> Void)?
 
     private let contentMaxWidth: CGFloat = 1_080
     private let polishCharacterThresholdOptions = [4, 8, 12, 20]
     private let polishTimeoutOptions: [Double] = [1.0, 1.5, 1.8, 2.5, 3.0]
     @State private var modelActionMessage = ""
 
+    init(
+        coordinator: VoiceSessionCoordinator,
+        agentMonitorCoordinator: AgentMonitorCoordinator,
+        embeddedDisplayCoordinator: EmbeddedDisplayCoordinator,
+        diagnosticsCoordinator: DiagnosticsCoordinator,
+        store: HomeWindowStore,
+        userProfileStore: UserProfileStore,
+        audioInputSettingsStore: AudioInputSettingsStore,
+        modelSettingsStore: OpenAIModelSettingsStore,
+        polishPlaygroundStore: PolishPlaygroundStore,
+        localWhisperModelStore: LocalWhisperModelStore,
+        senseVoiceModelStore: SenseVoiceModelStore,
+        memoryConstellationStore: MemoryConstellationStore,
+        memoryFeatureFlagStore: MemoryFeatureFlagStore,
+        pushToTalkSource: OnScreenPushToTalkSource,
+        bodyEvaluationProbe: (() -> Void)? = nil
+    ) {
+        self.coordinator = coordinator
+        self.agentMonitorCoordinator = agentMonitorCoordinator
+        self.embeddedDisplayCoordinator = embeddedDisplayCoordinator
+        self.diagnosticsCoordinator = diagnosticsCoordinator
+        self.store = store
+        self.userProfileStore = userProfileStore
+        self.audioInputSettingsStore = audioInputSettingsStore
+        self.modelSettingsStore = modelSettingsStore
+        self.polishPlaygroundStore = polishPlaygroundStore
+        self.localWhisperModelStore = localWhisperModelStore
+        self.senseVoiceModelStore = senseVoiceModelStore
+        self.memoryConstellationStore = memoryConstellationStore
+        self.memoryFeatureFlagStore = memoryFeatureFlagStore
+        self.pushToTalkSource = pushToTalkSource
+        self.bodyEvaluationProbe = bodyEvaluationProbe
+    }
+
     var body: some View {
+        let _ = bodyEvaluationProbe?()
         HStack(spacing: 0) {
             sidebar
                 .frame(width: 220)
@@ -189,9 +225,21 @@ struct HomeWindowView: View {
         case .model:
             modelPage
         case .monitor:
-            monitorPage
+            MonitorPageContent(
+                agentMonitorCoordinator: agentMonitorCoordinator,
+                embeddedDisplayCoordinator: embeddedDisplayCoordinator,
+                palette: store.palette,
+                formattedDate: { store.formattedDate($0) }
+            )
         case .debug:
-            debugPage
+            DebugPageContent(
+                coordinator: coordinator,
+                agentMonitorCoordinator: agentMonitorCoordinator,
+                embeddedDisplayCoordinator: embeddedDisplayCoordinator,
+                diagnosticsCoordinator: diagnosticsCoordinator,
+                polishPlaygroundStore: polishPlaygroundStore,
+                palette: store.palette
+            )
         case .settings:
             settingsPage
         }
@@ -1735,6 +1783,462 @@ struct HomeWindowView: View {
     private func openExternalURL(_ rawValue: String) {
         guard let url = normalizedExternalURL(from: rawValue) else { return }
         NSWorkspace.shared.open(url)
+    }
+}
+
+private struct MonitorPageContent: View {
+    @ObservedObject var agentMonitorCoordinator: AgentMonitorCoordinator
+    @ObservedObject var embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
+    let palette: HomeWindowStore.HomeThemePalette
+    let formattedDate: (Date) -> String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            PageTitle(
+                eyebrow: "监控",
+                title: "多 Agent 任务看板",
+                subtitle: "查看任务卡、provider 摘要和设备链路状态。"
+            )
+
+            GlassCard(palette: palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionHeader(
+                        title: "链路摘要",
+                        subtitle: "上位机生成快照，下位机仅接收并渲染。"
+                    )
+
+                    HStack(spacing: 12) {
+                        MetricCard(
+                            title: "活跃任务",
+                            value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.count)",
+                            detail: "当前可见卡片",
+                            symbol: "rectangle.stack.person.crop.fill",
+                            tint: palette.accent
+                        )
+                        MetricCard(
+                            title: "隐藏任务",
+                            value: "\(agentMonitorCoordinator.taskBoardSnapshot.hiddenCount)",
+                            detail: "超出 5 张后的数量",
+                            symbol: "ellipsis.rectangle",
+                            tint: palette.highlight
+                        )
+                        MetricCard(
+                            title: "传输状态",
+                            value: transportStatusTitle,
+                            detail: embeddedDisplayCoordinator.connectionState.reason ?? "链路正常",
+                            symbol: "display.2",
+                            tint: palette.accentSecondary
+                        )
+                    }
+
+                    HStack(spacing: 12) {
+                        Button("生成模拟任务") {
+                            agentMonitorCoordinator.runDemoSequence()
+                        }
+                        .buttonStyle(SecondaryPanelButtonStyle(palette: palette))
+
+                        Button("生成错误任务") {
+                            agentMonitorCoordinator.runErrorDemoSequence()
+                        }
+                        .buttonStyle(SecondaryPanelButtonStyle(palette: palette))
+
+                        Button("停止模拟") {
+                            agentMonitorCoordinator.stopDemoSequence()
+                        }
+                        .buttonStyle(SecondaryPanelButtonStyle(palette: palette))
+                    }
+                }
+            }
+
+            GlassCard(palette: palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        sectionHeader(
+                            title: "任务卡",
+                            subtitle: "按 RUN / CHECK / INPUT / APPROVE / ERROR 排序。"
+                        )
+                        Spacer()
+                        if !agentMonitorCoordinator.taskBoardSnapshot.cards.isEmpty {
+                            Button("下一张") {
+                                agentMonitorCoordinator.moveToNextCard()
+                            }
+                            .buttonStyle(SecondaryPanelButtonStyle(palette: palette))
+                        }
+                    }
+
+                    if agentMonitorCoordinator.taskBoardSnapshot.cards.isEmpty {
+                        EmptyStateCard(
+                            title: "还没有采集到任务",
+                            detail: "Codex 会优先从 JSONL 会话目录读取，Claude/Gemini/Cursor 会等待 hook inbox 事件落盘。"
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(agentMonitorCoordinator.taskBoardSnapshot.cards) { card in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(alignment: .center, spacing: 12) {
+                                        Label(card.provider.shortLabel, systemImage: card.provider.symbolName)
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text(card.title)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Text(card.boardState.rawValue)
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(cardStateColor(card.boardState))
+                                        Text("\(card.elapsedSeconds)s")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Text(card.progressText.isEmpty ? "暂无进度文本" : card.progressText)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                                .padding(16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(card.isSelected ? palette.softFill.opacity(0.95) : Color.white.opacity(0.82))
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(card.isSelected ? palette.accent.opacity(0.75) : palette.border.opacity(0.75), lineWidth: 1)
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    agentMonitorCoordinator.selectCard(id: card.id, userInitiated: true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HStack(alignment: .top, spacing: 18) {
+                GlassCard(palette: palette, padding: 22) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionHeader(
+                            title: "Provider 摘要",
+                            subtitle: "额度信息作为补充展示，不占主卡空间。"
+                        )
+
+                        ForEach(agentMonitorCoordinator.taskBoardSnapshot.providerSummaries) { summary in
+                            HStack {
+                                Label(summary.provider.displayName, systemImage: summary.provider.symbolName)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Spacer()
+                                Text("任务 \(summary.activeTaskCount)")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("输入 \(summary.waitingInputCount)")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("审批 \(summary.waitingApprovalCount)")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text("异常 \(summary.errorCount)")
+                                    .font(.system(size: 12, weight: .medium))
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                GlassCard(palette: palette, padding: 22) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionHeader(
+                            title: "设备输出",
+                            subtitle: "显示模式、最近发送与编码负载大小。"
+                        )
+
+                        StatusLine(label: "显示模式", value: embeddedDisplayCoordinator.lastSnapshot?.mode.rawValue ?? "blank")
+                        StatusLine(label: "最近发送", value: embeddedDisplayCoordinator.lastSentAt.map(formattedDate) ?? "暂无")
+                        StatusLine(label: "已确认序列", value: embeddedDisplayCoordinator.lastAckedSequence.map(String.init) ?? "暂无")
+                        StatusLine(label: "编码字节数", value: "\(embeddedDisplayCoordinator.lastEncodedByteCount)")
+                        StatusLine(label: "分片数", value: "\(embeddedDisplayCoordinator.lastFrameCount)")
+                    }
+                }
+                .frame(width: 320, alignment: .topLeading)
+            }
+        }
+    }
+
+    private var transportStatusTitle: String {
+        switch embeddedDisplayCoordinator.connectionState.phase {
+        case .disconnected:
+            return "未连接"
+        case .discovering:
+            return "发现中"
+        case .connecting:
+            return "连接中"
+        case .ready:
+            return "已就绪"
+        case .degraded:
+            return "降级"
+        case .failed:
+            return "失败"
+        }
+    }
+
+    private func cardStateColor(_ state: BoardState) -> Color {
+        switch state {
+        case .run:
+            return palette.highlight
+        case .check:
+            return .green
+        case .input:
+            return .orange
+        case .approve:
+            return palette.accent
+        case .error:
+            return .red
+        }
+    }
+
+    private func sectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+private struct DebugPageContent: View {
+    @ObservedObject var coordinator: VoiceSessionCoordinator
+    @ObservedObject var agentMonitorCoordinator: AgentMonitorCoordinator
+    @ObservedObject var embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
+    @ObservedObject var diagnosticsCoordinator: DiagnosticsCoordinator
+    @ObservedObject var polishPlaygroundStore: PolishPlaygroundStore
+    let palette: HomeWindowStore.HomeThemePalette
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            PageTitle(
+                eyebrow: "调试",
+                title: "诊断与回放",
+                subtitle: "查看 collector 健康、诊断事件与回放包。"
+            )
+
+            HStack(alignment: .top, spacing: 18) {
+                GlassCard(palette: palette, padding: 22) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionHeader(
+                            title: "Collector 健康状态",
+                            subtitle: "单个 provider 异常不应拖垮整体监控。"
+                        )
+
+                        ForEach(AgentProvider.allCases) { provider in
+                            let health = agentMonitorCoordinator.collectorHealth[provider] ?? CollectorHealthSnapshot(provider: provider)
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Label(provider.displayName, systemImage: provider.symbolName)
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Spacer()
+                                    Text(health.isRunning ? "运行中" : "未启动")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(health.isRunning ? .green : .secondary)
+                                }
+                                Text("tracked: \(health.trackedSourceCount)  dropped: \(health.droppedEventCount)")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                if let lastError = health.lastError, !lastError.isEmpty {
+                                    Text(lastError)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            Divider()
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+
+                GlassCard(palette: palette, padding: 22) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionHeader(
+                            title: "链路调试",
+                            subtitle: "链路保持无关抽象，当前先用 loopback / file dump。"
+                        )
+                        StatusLine(label: "连接状态", value: transportStatusTitle)
+                        StatusLine(label: "MTU", value: embeddedDisplayCoordinator.connectionState.deviceInfo.map { "\($0.maxPayloadBytes)" } ?? "未知")
+                        StatusLine(label: "协议版本", value: embeddedDisplayCoordinator.connectionState.deviceInfo.map { "\($0.protocolVersion)" } ?? "未知")
+                        StatusLine(label: "NACK", value: embeddedDisplayCoordinator.lastNackCode ?? "无")
+                    }
+                }
+                .frame(width: 320, alignment: .topLeading)
+            }
+
+            GlassCard(palette: palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionHeader(
+                        title: "最近诊断事件",
+                        subtitle: "monitor、reducer、display、transport 诊断统一汇总。"
+                    )
+
+                    if diagnosticsCoordinator.recentDiagnostics.isEmpty {
+                        EmptyStateCard(
+                            title: "还没有诊断事件",
+                            detail: "启动后 collector、快照构建和 transport 发送都会自动写入诊断日志。"
+                        )
+                    } else {
+                        ForEach(diagnosticsCoordinator.recentDiagnostics.prefix(12)) { event in
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(event.subsystem)
+                                        .font(.system(size: 12, weight: .semibold))
+                                    Spacer()
+                                    Text(event.severity == .info ? "INFO" : event.severity == .warning ? "WARN" : event.severity == .error ? "ERROR" : "CRITICAL")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(event.severity.rawValue >= DiagnosticSeverity.error.rawValue ? .red : .secondary)
+                                }
+                                Text(event.message)
+                                    .font(.system(size: 12))
+                                if !event.metadata.isEmpty {
+                                    Text(event.metadata.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: "  "))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            Divider()
+                        }
+                    }
+                }
+            }
+
+            GlassCard(palette: palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionHeader(
+                        title: "Replay Bundle",
+                        subtitle: "collector 或 transport 错误时自动抓取回放现场。"
+                    )
+
+                    if diagnosticsCoordinator.recentBundles.isEmpty {
+                        EmptyStateCard(
+                            title: "还没有回放包",
+                            detail: "当出现发送失败、严重诊断事件时，这里会记录 bundle 路径。"
+                        )
+                    } else {
+                        ForEach(diagnosticsCoordinator.recentBundles.prefix(8)) { bundle in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(bundle.bundleID)
+                                    .font(.system(size: 12, weight: .semibold))
+                                Text(bundle.rawEventsFile.path)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                Text(bundle.createdAt, style: .time)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Divider()
+                        }
+                    }
+                }
+            }
+
+            GlassCard(palette: palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionHeader(
+                        title: "润色测试台",
+                        subtitle: "直接调用当前 OpenAI 润色链路，不需要录音，也不会触发短句跳过逻辑。"
+                    )
+
+                    PlaceholderTextEditor(
+                        text: $polishPlaygroundStore.inputText,
+                        placeholder: "粘贴一段待润色的原始文本，例如一段口语化、重复较多的转写结果。"
+                    )
+                    .frame(minHeight: 180)
+
+                    HStack(spacing: 10) {
+                        Button(polishPlaygroundStore.isRunning ? "测试中..." : "直接测试润色") {
+                            Task {
+                                await polishPlaygroundStore.runCurrentInput()
+                            }
+                        }
+                        .buttonStyle(PrimaryPanelButtonStyle(palette: palette, isActive: false))
+                        .disabled(polishPlaygroundStore.isRunning)
+
+                        Button("填入当前最终文本") {
+                            let latestTranscript = coordinator.finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? coordinator.rawFinalTranscript
+                                : coordinator.finalTranscript
+                            polishPlaygroundStore.inputText = latestTranscript
+                        }
+                        .buttonStyle(SecondaryPanelButtonStyle(palette: palette))
+                        .disabled(
+                            coordinator.finalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                                coordinator.rawFinalTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        )
+                    }
+
+                    Text(polishPlaygroundStore.statusMessage)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+
+                    transcriptBubble(
+                        title: "润色输出",
+                        text: polishPlaygroundStore.outputText,
+                        placeholder: "点击按钮后，这里会显示当前 persona、术语词表和润色模型共同作用下的输出。"
+                    )
+                }
+            }
+        }
+    }
+
+    private var transportStatusTitle: String {
+        switch embeddedDisplayCoordinator.connectionState.phase {
+        case .disconnected:
+            return "未连接"
+        case .discovering:
+            return "发现中"
+        case .connecting:
+            return "连接中"
+        case .ready:
+            return "已就绪"
+        case .degraded:
+            return "降级"
+        case .failed:
+            return "失败"
+        }
+    }
+
+    private func sectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+            Text(subtitle)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func transcriptBubble(title: String, text: String, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.9))
+                .overlay(alignment: .topLeading) {
+                    Text(text.isEmpty ? placeholder : text)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(text.isEmpty ? .secondary : .primary)
+                        .padding(12)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .multilineTextAlignment(.leading)
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(palette.border.opacity(0.65), lineWidth: 1)
+                )
+                .frame(minHeight: 88)
+        }
     }
 }
 
