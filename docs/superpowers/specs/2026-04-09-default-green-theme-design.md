@@ -158,8 +158,8 @@ The theme migration should be explicit and versioned.
 
 Rules:
 
-- if the app detects an older theme-style version and no intentional override needs to be preserved, it should move the default selection to the new green preset
-- if the user already chose another theme preset, that selection remains intact
+- if the stored theme-style version is older than the new migration version, and the stored theme is missing or still set to the previous default preset, the app should move selection to the new green preset
+- if the stored theme-style version is older than the new migration version, but the stored theme is a non-default preset, that selection remains intact
 - the migration should update the stored theme version so the switch only happens once
 
 This keeps the new theme truly default without overwriting deliberate user choices.
