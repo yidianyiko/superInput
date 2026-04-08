@@ -6,12 +6,19 @@ import SpeechBarInfrastructure
 import SwiftUI
 
 @MainActor
+protocol HomeWindowControlling: AnyObject {
+    func showWindowAndActivate()
+}
+
+extension HomeWindowController: HomeWindowControlling {}
+
+@MainActor
 final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private let menu: NSMenu
-    private let homeWindowController: HomeWindowController
-    private let memoryConstellationStore: MemoryConstellationStore
+    private let homeWindowControllerFactory: () -> any HomeWindowControlling
+    private var homeWindowController: (any HomeWindowControlling)?
     private var sessionStateObservation: AnyCancellable?
 
     init(
@@ -27,27 +34,29 @@ final class StatusBarController: NSObject {
         localWhisperModelStore: LocalWhisperModelStore,
         senseVoiceModelStore: SenseVoiceModelStore,
         memoryConstellationStore: MemoryConstellationStore,
-        memoryFeatureFlagStore: MemoryFeatureFlagStore
+        memoryFeatureFlagStore: MemoryFeatureFlagStore,
+        homeWindowControllerFactory: (() -> any HomeWindowControlling)? = nil
     ) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.popover = NSPopover()
         self.menu = NSMenu()
-        self.memoryConstellationStore = memoryConstellationStore
-        self.homeWindowController = HomeWindowController(
-            coordinator: coordinator,
-            agentMonitorCoordinator: agentMonitorCoordinator,
-            embeddedDisplayCoordinator: embeddedDisplayCoordinator,
-            diagnosticsCoordinator: diagnosticsCoordinator,
-            pushToTalkSource: pushToTalkSource,
-            userProfileStore: userProfileStore,
-            audioInputSettingsStore: audioInputSettingsStore,
-            modelSettingsStore: modelSettingsStore,
-            polishPlaygroundStore: polishPlaygroundStore,
-            localWhisperModelStore: localWhisperModelStore,
-            senseVoiceModelStore: senseVoiceModelStore,
-            memoryConstellationStore: memoryConstellationStore,
-            memoryFeatureFlagStore: memoryFeatureFlagStore
-        )
+        self.homeWindowControllerFactory = homeWindowControllerFactory ?? {
+            HomeWindowController(
+                coordinator: coordinator,
+                agentMonitorCoordinator: agentMonitorCoordinator,
+                embeddedDisplayCoordinator: embeddedDisplayCoordinator,
+                diagnosticsCoordinator: diagnosticsCoordinator,
+                pushToTalkSource: pushToTalkSource,
+                userProfileStore: userProfileStore,
+                audioInputSettingsStore: audioInputSettingsStore,
+                modelSettingsStore: modelSettingsStore,
+                polishPlaygroundStore: polishPlaygroundStore,
+                localWhisperModelStore: localWhisperModelStore,
+                senseVoiceModelStore: senseVoiceModelStore,
+                memoryConstellationStore: memoryConstellationStore,
+                memoryFeatureFlagStore: memoryFeatureFlagStore
+            )
+        }
         super.init()
 
         configureStatusItem()
@@ -211,6 +220,7 @@ final class StatusBarController: NSObject {
         if popover.isShown {
             popover.performClose(nil)
         }
+        let homeWindowController = resolvedHomeWindowController()
         homeWindowController.showWindowAndActivate()
     }
 
@@ -221,5 +231,15 @@ final class StatusBarController: NSObject {
     @objc
     private func quitApplication() {
         NSApp.terminate(nil)
+    }
+
+    private func resolvedHomeWindowController() -> any HomeWindowControlling {
+        if let homeWindowController {
+            return homeWindowController
+        }
+
+        let homeWindowController = homeWindowControllerFactory()
+        self.homeWindowController = homeWindowController
+        return homeWindowController
     }
 }
