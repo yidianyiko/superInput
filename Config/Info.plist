@@ -22,8 +22,6 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
-    <key>LSUIElement</key>
-    <true/>
     <key>NSAccessibilityUsageDescription</key>
     <string>SlashVibe needs Accessibility access to listen for the right Command key and paste transcribed text into the focused input box.</string>
     <key>NSMicrophoneUsageDescription</key>

@@ -25,6 +25,10 @@ cp "$ROOT_DIR/Config/Info.plist" "$APP_DIR/Contents/Info.plist"
 if [[ -d "$ROOT_DIR/Resources" ]]; then
     rsync -a "$ROOT_DIR/Resources/" "$APP_DIR/Contents/Resources/"
 fi
+if [[ -d "$ROOT_DIR/Sources/SpeechBarApp/Resources/HardwareBridge" ]]; then
+    mkdir -p "$APP_DIR/Contents/Resources/HardwareBridge"
+    rsync -a "$ROOT_DIR/Sources/SpeechBarApp/Resources/HardwareBridge/" "$APP_DIR/Contents/Resources/HardwareBridge/"
+fi
 
 if ! security find-identity -v -p codesigning | grep -F "\"$SIGNING_IDENTITY\"" >/dev/null; then
     echo "Signing identity not found: $SIGNING_IDENTITY" >&2

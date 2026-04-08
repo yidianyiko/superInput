@@ -5,6 +5,11 @@ import SwiftUI
 
 @MainActor
 final class HomeWindowController: NSWindowController, NSWindowDelegate {
+    private enum ActivationMode {
+        case accessory
+        case regular
+    }
+
     private let store: HomeWindowStore
     private let agentMonitorCoordinator: AgentMonitorCoordinator
     private let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
@@ -77,7 +82,25 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
 
     func showWindowAndActivate() {
         guard let window else { return }
+        applyActivationMode(.regular)
+        NSApp.unhide(nil)
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        applyActivationMode(.accessory)
+    }
+
+    private func applyActivationMode(_ mode: ActivationMode) {
+        let policy: NSApplication.ActivationPolicy = switch mode {
+        case .accessory:
+            .accessory
+        case .regular:
+            .regular
+        }
+
+        guard NSApp.activationPolicy() != policy else { return }
+        _ = NSApp.setActivationPolicy(policy)
     }
 }
