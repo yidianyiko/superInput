@@ -16,11 +16,11 @@ struct StatusPanelView: View {
     let pushToTalkSource: OnScreenPushToTalkSource
     let openHomeAction: (() -> Void)?
 
-    @AppStorage("home.selectedTheme") private var selectedThemeRaw = HomeWindowStore.ThemePreset.apple.rawValue
+    @AppStorage("home.selectedTheme") private var selectedThemeRaw = HomeWindowStore.ThemePreset.green.rawValue
     @State private var apiKeyInput = ""
 
     private var selectedTheme: HomeWindowStore.ThemePreset {
-        HomeWindowStore.ThemePreset(rawValue: selectedThemeRaw) ?? .sunrise
+        HomeWindowStore.ThemePreset(rawValue: selectedThemeRaw) ?? .green
     }
 
     private var palette: HomeWindowStore.HomeThemePalette {

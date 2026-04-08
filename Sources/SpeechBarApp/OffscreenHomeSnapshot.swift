@@ -30,6 +30,7 @@ struct OffscreenHomeSnapshotCommand: Sendable {
     }
 
     enum ThemeOverride: String, Sendable {
+        case green
         case apple
         case sunrise
         case ocean
@@ -333,6 +334,8 @@ private final class SnapshotEnvironment {
 
     private static func mapTheme(from override: OffscreenHomeSnapshotCommand.ThemeOverride) -> HomeWindowStore.ThemePreset {
         switch override {
+        case .green:
+            return .green
         case .apple:
             return .apple
         case .sunrise:

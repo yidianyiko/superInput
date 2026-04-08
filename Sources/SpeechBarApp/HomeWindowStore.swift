@@ -52,6 +52,7 @@ final class HomeWindowStore: ObservableObject {
     }
 
     enum ThemePreset: String, CaseIterable, Codable, Identifiable {
+        case green
         case apple
         case sunrise
         case ocean
@@ -62,6 +63,8 @@ final class HomeWindowStore: ObservableObject {
 
         var title: String {
             switch self {
+            case .green:
+                return "Green"
             case .apple:
                 return "Apple"
             case .sunrise:
@@ -77,6 +80,8 @@ final class HomeWindowStore: ObservableObject {
 
         var subtitle: String {
             switch self {
+            case .green:
+                return "深色品牌主题，突出荧光绿强调"
             case .apple:
                 return "浅灰画布、黑白层级与单一蓝色强调"
             case .sunrise:
@@ -92,6 +97,28 @@ final class HomeWindowStore: ObservableObject {
 
         var palette: HomeThemePalette {
             switch self {
+            case .green:
+                return HomeThemePalette(
+                    accent: Color(red: 0.00, green: 0.97, blue: 0.64),
+                    accentSecondary: Color(red: 0.00, green: 0.84, blue: 0.56),
+                    highlight: Color(red: 0.00, green: 0.91, blue: 0.60),
+                    sidebarTop: Color.black,
+                    sidebarBottom: Color(red: 0.03, green: 0.03, blue: 0.03),
+                    canvasTop: Color.black,
+                    canvasBottom: Color(red: 0.03, green: 0.03, blue: 0.04),
+                    cardTop: Color(red: 0.06, green: 0.06, blue: 0.07),
+                    cardBottom: Color(red: 0.04, green: 0.04, blue: 0.05),
+                    border: Color.white.opacity(0.12),
+                    softFill: Color.white.opacity(0.06),
+                    textPrimary: Color.white,
+                    textSecondary: Color.white.opacity(0.78),
+                    textMuted: Color.white.opacity(0.56),
+                    elevatedFill: Color.white.opacity(0.08),
+                    controlFill: Color.white.opacity(0.10),
+                    controlStroke: Color.white.opacity(0.14),
+                    controlText: Color.white,
+                    isDark: true
+                )
             case .apple:
                 return HomeThemePalette(
                     accent: Color(red: 0.00, green: 0.44, blue: 0.89),
@@ -104,7 +131,15 @@ final class HomeWindowStore: ObservableObject {
                     cardTop: Color.white.opacity(0.98),
                     cardBottom: Color.white.opacity(0.94),
                     border: Color.black.opacity(0.08),
-                    softFill: Color.black.opacity(0.035)
+                    softFill: Color.black.opacity(0.035),
+                    textPrimary: Color(red: 0.11, green: 0.11, blue: 0.12),
+                    textSecondary: Color.black.opacity(0.62),
+                    textMuted: Color.black.opacity(0.42),
+                    elevatedFill: Color.white,
+                    controlFill: Color.white.opacity(0.96),
+                    controlStroke: Color.black.opacity(0.08),
+                    controlText: Color(red: 0.11, green: 0.11, blue: 0.12),
+                    isDark: false
                 )
             case .sunrise:
                 return HomeThemePalette(
@@ -118,7 +153,15 @@ final class HomeWindowStore: ObservableObject {
                     cardTop: Color.white,
                     cardBottom: Color(red: 0.99, green: 0.96, blue: 0.93),
                     border: Color(red: 0.90, green: 0.84, blue: 0.79),
-                    softFill: Color(red: 0.98, green: 0.93, blue: 0.88)
+                    softFill: Color(red: 0.98, green: 0.93, blue: 0.88),
+                    textPrimary: Color(red: 0.12, green: 0.11, blue: 0.10),
+                    textSecondary: Color(red: 0.39, green: 0.30, blue: 0.23),
+                    textMuted: Color(red: 0.54, green: 0.44, blue: 0.36),
+                    elevatedFill: Color.white,
+                    controlFill: Color.white.opacity(0.96),
+                    controlStroke: Color(red: 0.90, green: 0.84, blue: 0.79),
+                    controlText: Color(red: 0.12, green: 0.11, blue: 0.10),
+                    isDark: false
                 )
             case .ocean:
                 return HomeThemePalette(
@@ -132,7 +175,15 @@ final class HomeWindowStore: ObservableObject {
                     cardTop: Color.white,
                     cardBottom: Color(red: 0.94, green: 0.98, blue: 1.00),
                     border: Color(red: 0.80, green: 0.88, blue: 0.95),
-                    softFill: Color(red: 0.90, green: 0.96, blue: 0.99)
+                    softFill: Color(red: 0.90, green: 0.96, blue: 0.99),
+                    textPrimary: Color(red: 0.11, green: 0.12, blue: 0.14),
+                    textSecondary: Color(red: 0.33, green: 0.43, blue: 0.52),
+                    textMuted: Color(red: 0.50, green: 0.60, blue: 0.67),
+                    elevatedFill: Color.white,
+                    controlFill: Color.white.opacity(0.96),
+                    controlStroke: Color(red: 0.80, green: 0.88, blue: 0.95),
+                    controlText: Color(red: 0.11, green: 0.12, blue: 0.14),
+                    isDark: false
                 )
             case .forest:
                 return HomeThemePalette(
@@ -146,7 +197,15 @@ final class HomeWindowStore: ObservableObject {
                     cardTop: Color.white,
                     cardBottom: Color(red: 0.95, green: 0.98, blue: 0.93),
                     border: Color(red: 0.82, green: 0.88, blue: 0.79),
-                    softFill: Color(red: 0.92, green: 0.96, blue: 0.89)
+                    softFill: Color(red: 0.92, green: 0.96, blue: 0.89),
+                    textPrimary: Color(red: 0.11, green: 0.12, blue: 0.11),
+                    textSecondary: Color(red: 0.31, green: 0.40, blue: 0.30),
+                    textMuted: Color(red: 0.48, green: 0.57, blue: 0.47),
+                    elevatedFill: Color.white,
+                    controlFill: Color.white.opacity(0.96),
+                    controlStroke: Color(red: 0.82, green: 0.88, blue: 0.79),
+                    controlText: Color(red: 0.11, green: 0.12, blue: 0.11),
+                    isDark: false
                 )
             case .graphite:
                 return HomeThemePalette(
@@ -160,7 +219,15 @@ final class HomeWindowStore: ObservableObject {
                     cardTop: Color.white,
                     cardBottom: Color(red: 0.95, green: 0.95, blue: 0.97),
                     border: Color(red: 0.81, green: 0.83, blue: 0.87),
-                    softFill: Color(red: 0.92, green: 0.93, blue: 0.95)
+                    softFill: Color(red: 0.92, green: 0.93, blue: 0.95),
+                    textPrimary: Color(red: 0.11, green: 0.11, blue: 0.12),
+                    textSecondary: Color(red: 0.34, green: 0.36, blue: 0.40),
+                    textMuted: Color(red: 0.49, green: 0.51, blue: 0.55),
+                    elevatedFill: Color.white,
+                    controlFill: Color.white.opacity(0.96),
+                    controlStroke: Color(red: 0.81, green: 0.83, blue: 0.87),
+                    controlText: Color(red: 0.11, green: 0.11, blue: 0.12),
+                    isDark: false
                 )
             }
         }
@@ -178,6 +245,56 @@ final class HomeWindowStore: ObservableObject {
         let cardBottom: Color
         let border: Color
         let softFill: Color
+        let textPrimary: Color
+        let textSecondary: Color
+        let textMuted: Color
+        let elevatedFill: Color
+        let controlFill: Color
+        let controlStroke: Color
+        let controlText: Color
+        let isDark: Bool
+
+        init(
+            accent: Color,
+            accentSecondary: Color,
+            highlight: Color,
+            sidebarTop: Color,
+            sidebarBottom: Color,
+            canvasTop: Color,
+            canvasBottom: Color,
+            cardTop: Color,
+            cardBottom: Color,
+            border: Color,
+            softFill: Color,
+            textPrimary: Color = Color(red: 0.11, green: 0.11, blue: 0.12),
+            textSecondary: Color = Color.black.opacity(0.62),
+            textMuted: Color = Color.black.opacity(0.42),
+            elevatedFill: Color = Color.white,
+            controlFill: Color = Color.white.opacity(0.96),
+            controlStroke: Color = Color.black.opacity(0.08),
+            controlText: Color = Color(red: 0.11, green: 0.11, blue: 0.12),
+            isDark: Bool = false
+        ) {
+            self.accent = accent
+            self.accentSecondary = accentSecondary
+            self.highlight = highlight
+            self.sidebarTop = sidebarTop
+            self.sidebarBottom = sidebarBottom
+            self.canvasTop = canvasTop
+            self.canvasBottom = canvasBottom
+            self.cardTop = cardTop
+            self.cardBottom = cardBottom
+            self.border = border
+            self.softFill = softFill
+            self.textPrimary = textPrimary
+            self.textSecondary = textSecondary
+            self.textMuted = textMuted
+            self.elevatedFill = elevatedFill
+            self.controlFill = controlFill
+            self.controlStroke = controlStroke
+            self.controlText = controlText
+            self.isDark = isDark
+        }
     }
 
     struct TranscriptHistoryItem: Codable, Identifiable, Equatable {
@@ -217,7 +334,7 @@ final class HomeWindowStore: ObservableObject {
     @Published private(set) var history: [TranscriptHistoryItem]
 
     let coordinator: VoiceSessionCoordinator
-    private static let currentThemeStyleVersion = 2
+    private static let currentThemeStyleVersion = 3
 
     private let defaults: UserDefaults
     private var cancellables: Set<AnyCancellable> = []
@@ -231,8 +348,8 @@ final class HomeWindowStore: ObservableObject {
         self.selectedSection = Self.loadSection(from: defaults)
         self.memoryProfile = Self.loadString(forKey: Keys.memoryProfile, from: defaults)
         let loadedTheme = Self.loadTheme(from: defaults)
-        let shouldAdoptAppleTheme = defaults.integer(forKey: Keys.themeStyleVersion) < Self.currentThemeStyleVersion
-        self.selectedTheme = shouldAdoptAppleTheme ? .apple : loadedTheme
+        let shouldMigrateLegacyAppleDefault = defaults.integer(forKey: Keys.themeStyleVersion) < Self.currentThemeStyleVersion && loadedTheme == .apple
+        self.selectedTheme = shouldMigrateLegacyAppleDefault ? .green : loadedTheme
         self.modelConfiguration = Self.loadModelConfiguration(from: defaults)
         self.subscriptionPurchaseURL = Self.loadString(
             forKey: Keys.subscriptionPurchaseURL,
@@ -245,10 +362,8 @@ final class HomeWindowStore: ObservableObject {
             fallback: "https://your-domain.com/account/billing"
         )
         self.history = Self.loadHistory(from: defaults)
-        if shouldAdoptAppleTheme {
-            defaults.set(ThemePreset.apple.rawValue, forKey: Keys.selectedTheme)
-            defaults.set(Self.currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
-        }
+        defaults.set(self.selectedTheme.rawValue, forKey: Keys.selectedTheme)
+        defaults.set(Self.currentThemeStyleVersion, forKey: Keys.themeStyleVersion)
         bindPersistence()
         bindCoordinator()
     }
@@ -484,7 +599,7 @@ final class HomeWindowStore: ObservableObject {
             let rawValue = defaults.string(forKey: Keys.selectedTheme),
             let theme = ThemePreset(rawValue: rawValue)
         else {
-            return .apple
+            return .green
         }
         return theme
     }
