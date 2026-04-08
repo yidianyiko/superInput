@@ -14,6 +14,7 @@ final class MemoryConstellationStore: ObservableObject {
     private let featureFlags: MemoryFeatureFlagStore
     private let builder: MemoryConstellationBuilder
     private var memories: [MemoryItem] = []
+    private let minimumLiveMemoryCountForRealOnlyPresentation = 5
 
     init(
         catalog: (any MemoryCatalogProviding)?,
@@ -26,11 +27,13 @@ final class MemoryConstellationStore: ObservableObject {
     }
 
     func reload() async {
+        let liveMemories: [MemoryItem]
         do {
-            memories = try await catalog?.listMemories(matching: MemoryCenterQuery(limit: 200)) ?? []
+            liveMemories = try await catalog?.listMemories(matching: MemoryCenterQuery(limit: 200)) ?? []
         } catch {
-            memories = []
+            liveMemories = []
         }
+        memories = presentationMemories(from: liveMemories)
         rebuildSnapshot()
     }
 
@@ -82,5 +85,80 @@ final class MemoryConstellationStore: ObservableObject {
             viewMode: selectedViewMode,
             displayMode: featureFlags.displayMode
         )
+    }
+
+    private func presentationMemories(from liveMemories: [MemoryItem]) -> [MemoryItem] {
+        guard liveMemories.count < minimumLiveMemoryCountForRealOnlyPresentation else {
+            return liveMemories
+        }
+
+        let now = builder.now()
+        guard !liveMemories.isEmpty else {
+            return MemoryConstellationFixtures.defaultMemories(now: now)
+        }
+
+        let neededSupplementCount = minimumLiveMemoryCountForRealOnlyPresentation - liveMemories.count
+        let representedKinds = Set(liveMemories.map(clusterKind(for:)))
+        let seenIdentityHashes = Set(liveMemories.map(\.identityHash))
+
+        let demoCandidates = uniqueDemoCandidates(now: now, excluding: seenIdentityHashes)
+        let supplementalDemoMemories = prioritizedDemoCandidates(
+            from: demoCandidates,
+            representedKinds: representedKinds
+        )
+        .prefix(neededSupplementCount)
+        .map { softenedDemoMemory($0, now: now) }
+
+        return liveMemories + supplementalDemoMemories
+    }
+
+    private func uniqueDemoCandidates(now: Date, excluding identityHashes: Set<String>) -> [MemoryItem] {
+        var seen = identityHashes
+        let candidates = MemoryConstellationFixtures.defaultMemories(now: now)
+            + MemoryConstellationFixtures.dominantMemories(now: now)
+
+        return candidates.filter { seen.insert($0.identityHash).inserted }
+    }
+
+    private func prioritizedDemoCandidates(
+        from candidates: [MemoryItem],
+        representedKinds: Set<MemoryConstellationClusterKind>
+    ) -> [MemoryItem] {
+        let missingKinds = MemoryConstellationClusterKind.allCases.filter { !representedKinds.contains($0) }
+        let preferred = candidates.filter { missingKinds.contains(clusterKind(for: $0)) }
+        let remaining = candidates.filter { !missingKinds.contains(clusterKind(for: $0)) }
+        return preferred + remaining
+    }
+
+    private func softenedDemoMemory(_ memory: MemoryItem, now: Date) -> MemoryItem {
+        let softenedUpdatedAt = min(memory.updatedAt, now.addingTimeInterval(-48 * 60 * 60))
+        let softenedCreatedAt = min(memory.createdAt, softenedUpdatedAt.addingTimeInterval(-10))
+
+        return MemoryItem(
+            id: memory.id,
+            type: memory.type,
+            key: memory.key,
+            valuePayload: memory.valuePayload,
+            valueFingerprint: memory.valueFingerprint,
+            identityHash: memory.identityHash,
+            scope: memory.scope,
+            confidence: min(memory.confidence, 0.58),
+            status: memory.status,
+            createdAt: softenedCreatedAt,
+            updatedAt: softenedUpdatedAt,
+            lastConfirmedAt: softenedUpdatedAt,
+            sourceEventIDs: memory.sourceEventIDs
+        )
+    }
+
+    private func clusterKind(for memory: MemoryItem) -> MemoryConstellationClusterKind {
+        switch memory.type {
+        case .vocabulary, .correction:
+            return .vocabulary
+        case .style:
+            return .style
+        case .scene:
+            return .scenes
+        }
     }
 }

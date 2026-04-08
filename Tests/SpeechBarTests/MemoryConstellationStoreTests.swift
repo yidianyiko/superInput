@@ -7,6 +7,60 @@ import MemoryDomain
 struct MemoryConstellationStoreTests {
     @Test
     @MainActor
+    func reloadFallsBackToDemoConstellationWhenNoRealMemoriesExist() async throws {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.demo-empty.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let store = MemoryConstellationStore(
+            catalog: InlineCatalogProvider(memories: []),
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
+
+        await store.reload()
+
+        #expect(store.snapshot.clusters.map(\.kind) == [.vocabulary, .style, .scenes])
+        #expect(store.snapshot.statusPills.contains("4 memories"))
+    }
+
+    @Test
+    @MainActor
+    func reloadAugmentsSparseRealMemoriesWithDemoConstellation() async throws {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.demo-sparse.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let store = MemoryConstellationStore(
+            catalog: InlineCatalogProvider(memories: sampleMemories()),
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
+
+        await store.reload()
+
+        #expect(store.snapshot.clusters.contains(where: { $0.kind == .scenes }))
+        #expect(store.snapshot.statusPills.contains("5 memories"))
+        #expect(store.snapshot.clusters.contains(where: { cluster in
+            cluster.kind == .vocabulary && cluster.stars.contains(where: { $0.label == "OpenAI" })
+        }))
+    }
+
+    @Test
+    @MainActor
+    func reloadStopsUsingDemoMemoriesOnceRealMemoriesReachFiveItems() async throws {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.demo-live.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let store = MemoryConstellationStore(
+            catalog: InlineCatalogProvider(memories: fiveVocabularyMemories()),
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
+
+        await store.reload()
+
+        #expect(store.snapshot.clusters.map(\.kind) == [.vocabulary])
+        #expect(store.snapshot.statusPills.contains("5 memories"))
+    }
+
+    @Test
+    @MainActor
     func hoverClusterTransitionsFromOverviewToClusterFocus() async throws {
         let defaults = UserDefaults(suiteName: "MemoryConstellationStore.hover.\(UUID().uuidString)")!
         let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
@@ -106,4 +160,24 @@ private func sampleMemories() -> [MemoryItem] {
             sourceEventIDs: [shared]
         )
     ]
+}
+
+private func fiveVocabularyMemories() -> [MemoryItem] {
+    (0..<5).map { index in
+        MemoryItem(
+            id: UUID(),
+            type: .vocabulary,
+            key: "vocabulary:demo-\(index)",
+            valuePayload: Data("Demo \(index)".utf8),
+            valueFingerprint: "Demo \(index)",
+            identityHash: "vocabulary|demo-\(index)",
+            scope: .app("com.apple.mail"),
+            confidence: 0.90 - (Double(index) * 0.05),
+            status: .active,
+            createdAt: Date(timeIntervalSince1970: 100 - Double(index)),
+            updatedAt: Date(timeIntervalSince1970: 100 - Double(index)),
+            lastConfirmedAt: Date(timeIntervalSince1970: 100 - Double(index)),
+            sourceEventIDs: [UUID()]
+        )
+    }
 }
