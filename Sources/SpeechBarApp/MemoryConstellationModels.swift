@@ -59,6 +59,7 @@ struct MemoryConstellationSnapshot: Equatable {
     let relationshipCards: [MemoryConstellationRelationshipCard]
     let timeline: MemoryConstellationTimeline
     let accessibilitySummary: String
+    let accessibilityHint: String
 
     static let hidden = MemoryConstellationSnapshot(
         title: "My Universe",
@@ -69,7 +70,8 @@ struct MemoryConstellationSnapshot: Equatable {
         guidanceCards: [],
         relationshipCards: [],
         timeline: .empty,
-        accessibilitySummary: "Memory visibility is hidden. No constellation is shown."
+        accessibilitySummary: "Memory visibility is hidden. No constellation is shown.",
+        accessibilityHint: "Enable memory visibility to restore constellation content."
     )
 }
 
@@ -110,6 +112,8 @@ struct MemoryConstellationRelationshipCard: Identifiable, Equatable {
     let bridgeID: UUID?
     let title: String
     let body: String
+    let accessibilityLabel: String
+    let accessibilityHint: String
 }
 
 struct MemoryConstellationTimeline: Equatable {

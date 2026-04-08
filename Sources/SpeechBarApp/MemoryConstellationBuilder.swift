@@ -55,7 +55,8 @@ struct MemoryConstellationBuilder {
             guidanceCards: guidanceCards,
             relationshipCards: relationshipCards,
             timeline: buildTimeline(from: filtered),
-            accessibilitySummary: buildAccessibilitySummary(clusters: clusters, bridges: bridges, displayMode: displayMode)
+            accessibilitySummary: buildAccessibilitySummary(clusters: clusters, bridges: bridges, displayMode: displayMode),
+            accessibilityHint: buildAccessibilityHint(displayMode: displayMode)
         )
     }
 
@@ -192,12 +193,17 @@ struct MemoryConstellationBuilder {
                     title: "Emerging Themes",
                     body: displayMode == .privacySafe
                         ? "Protected themes are forming, but no strong bridge is visible yet."
-                        : "Themes are present, but no single bridge stands out yet."
+                        : "Themes are present, but no single bridge stands out yet.",
+                    accessibilityLabel: displayMode == .privacySafe
+                        ? "Emerging Themes. Protected themes are forming, but no strong bridge is visible yet."
+                        : "Emerging Themes. Themes are present, but no single bridge stands out yet.",
+                    accessibilityHint: "Select to return to the constellation overview."
                 )
             ]
         }
 
         return bridges.prefix(3).enumerated().map { index, bridge in
+            let orderedThemes = orderedThemeTitles(for: bridge)
             let title: String
             switch index {
             case 0:
@@ -210,16 +216,23 @@ struct MemoryConstellationBuilder {
 
             let body: String
             if displayMode == .privacySafe {
-                body = "Protected relationship connecting \(bridge.from.title) and \(bridge.to.title)."
+                body = "Protected relationship connecting \(orderedThemes.0) and \(orderedThemes.1)."
             } else {
-                body = "\(bridge.from.title) is currently reinforcing \(bridge.to.title)."
+                body = "\(orderedThemes.0) is currently reinforcing \(orderedThemes.1)."
             }
+
+            let accessibilityLabel = "\(title). \(body)"
+            let accessibilityHint = bridge.isFocused
+                ? "Select to return to the constellation overview."
+                : "Select to focus this bridge on the canvas."
 
             return MemoryConstellationRelationshipCard(
                 id: UUID(),
                 bridgeID: bridge.id,
                 title: title,
-                body: body
+                body: body,
+                accessibilityLabel: accessibilityLabel,
+                accessibilityHint: accessibilityHint
             )
         }
     }
@@ -278,19 +291,84 @@ struct MemoryConstellationBuilder {
         bridges: [MemoryConstellationBridge],
         displayMode: MemoryConstellationDisplayMode
     ) -> String {
+        let themesSummary = themeSummary(for: clusters)
+
         switch displayMode {
         case .hidden:
             return "Memory visibility is hidden. No constellation is shown."
         case .privacySafe:
-            return "Protected constellation view."
+            let prefix = "Protected memory constellation."
+            if let bridge = bridges.first {
+                let orderedThemes = orderedThemeTitles(for: bridge)
+                return [prefix, themesSummary, "Strongest protected bridge connects \(orderedThemes.0) and \(orderedThemes.1)."]
+                    .compactMap { $0 }
+                    .joined(separator: " ")
+            }
+            if let themesSummary {
+                return "\(prefix) \(themesSummary) No strong protected bridge is active today."
+            }
+            return "\(prefix) No themes are visible yet."
         case .full:
             if let bridge = bridges.first {
-                return "Memory constellation ready. Strongest bridge connects \(bridge.from.title) and \(bridge.to.title)."
+                let orderedThemes = orderedThemeTitles(for: bridge)
+                return [
+                    "Memory constellation ready.",
+                    themesSummary,
+                    "Strongest bridge connects \(orderedThemes.0) and \(orderedThemes.1)."
+                ]
+                .compactMap { $0 }
+                .joined(separator: " ")
             }
-            if clusters.isEmpty {
-                return "Memory constellation ready."
+            if let themesSummary {
+                return "Memory constellation ready. \(themesSummary) No strong bridge is active today."
             }
-            return "Memory constellation ready. No strong bridge is active today."
+            return "Memory constellation ready. No themes are visible yet."
+        }
+    }
+
+    private func buildAccessibilityHint(displayMode: MemoryConstellationDisplayMode) -> String {
+        switch displayMode {
+        case .hidden:
+            return "Enable memory visibility to restore constellation content."
+        case .privacySafe:
+            return "Use the cluster and relationship controls to explore themes without exposing protected memory terms."
+        case .full:
+            return "Use the cluster and relationship controls to explore the main themes and strongest bridges."
+        }
+    }
+
+    private func themeSummary(for clusters: [MemoryConstellationCluster]) -> String? {
+        let titles = clusters
+            .sorted { clusterOrderIndex(for: $0.kind) < clusterOrderIndex(for: $1.kind) }
+            .map(\.title)
+        guard titles.isEmpty == false else {
+            return nil
+        }
+        return "Main themes include \(naturalLanguageList(titles))."
+    }
+
+    private func orderedThemeTitles(for bridge: MemoryConstellationBridge) -> (String, String) {
+        if clusterOrderIndex(for: bridge.from) <= clusterOrderIndex(for: bridge.to) {
+            return (bridge.from.title, bridge.to.title)
+        }
+        return (bridge.to.title, bridge.from.title)
+    }
+
+    private func clusterOrderIndex(for kind: MemoryConstellationClusterKind) -> Int {
+        MemoryConstellationClusterKind.allCases.firstIndex(of: kind) ?? .max
+    }
+
+    private func naturalLanguageList(_ items: [String]) -> String {
+        switch items.count {
+        case 0:
+            return ""
+        case 1:
+            return items[0]
+        case 2:
+            return "\(items[0]) and \(items[1])"
+        default:
+            let prefix = items.dropLast().joined(separator: ", ")
+            return "\(prefix), and \(items.last!)"
         }
     }
 

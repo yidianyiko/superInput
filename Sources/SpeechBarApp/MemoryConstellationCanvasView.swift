@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 
 struct MemoryConstellationCanvasView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let snapshot: MemoryConstellationSnapshot
     let focus: MemoryConstellationFocus
     let selectedViewMode: MemoryConstellationViewMode
@@ -56,7 +58,16 @@ struct MemoryConstellationCanvasView: View {
             }
             .frame(minHeight: 470)
         }
+        .transaction { transaction in
+            if reduceMotion {
+                transaction.animation = nil
+            }
+        }
         .accessibilityLabel(Text(snapshot.accessibilitySummary))
+        .accessibilityHint(Text(snapshot.accessibilityHint))
+        .accessibilityElement(children: .contain)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: focusAccessibilityKey)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.24), value: snapshot.highlightedBridges.map(\.id))
         .onChange(of: focus) { newFocus in
             interactionState.sync(with: newFocus)
         }
@@ -74,6 +85,7 @@ struct MemoryConstellationCanvasView: View {
                     )
             }
         }
+        .accessibilityHidden(true)
     }
 
     private func bridgeLayer(_ bridge: MemoryConstellationBridge, size: CGSize) -> some View {
@@ -105,6 +117,7 @@ struct MemoryConstellationCanvasView: View {
                 style: StrokeStyle(lineWidth: focused ? 4 : 2, lineCap: .round, dash: focused ? [] : [8, 8])
             )
             .shadow(color: MemoryConstellationTheme.accentGold.opacity(focused ? 0.42 : 0.18), radius: focused ? 10 : 4)
+            .accessibilityHidden(true)
 
             Button {
                 focusBridge(focused ? nil : bridge.id)
@@ -130,6 +143,8 @@ struct MemoryConstellationCanvasView: View {
             }
             .buttonStyle(.plain)
             .position(x: midpoint.x, y: midpoint.y - (focused ? 28 : 10))
+            .accessibilityLabel(Text(bridgeAccessibilityLabel(for: bridge, focused: focused)))
+            .accessibilityHint(Text(focused ? "Select to return to the constellation overview." : "Select to focus this bridge on the canvas."))
         }
     }
 
@@ -144,10 +159,12 @@ struct MemoryConstellationCanvasView: View {
                 .fill(MemoryConstellationTheme.clusterGlow(for: cluster.kind, emphasis: cluster.emphasis))
                 .frame(width: radius * 2, height: radius * 2)
                 .blur(radius: focused ? 10 : 18)
+                .accessibilityHidden(true)
 
             Circle()
                 .stroke(MemoryConstellationTheme.clusterColor(for: cluster.kind).opacity(focused ? 0.68 : 0.28), lineWidth: focused ? 1.6 : 1)
                 .frame(width: radius * 1.18, height: radius * 1.18)
+                .accessibilityHidden(true)
 
             ForEach(Array(cluster.stars.enumerated()), id: \.element.id) { index, star in
                 Circle()
@@ -155,6 +172,7 @@ struct MemoryConstellationCanvasView: View {
                     .frame(width: starDiameter(star), height: starDiameter(star))
                     .shadow(color: Color.white.opacity(focused ? 0.32 : 0.18), radius: focused ? 7 : 3)
                     .position(starPosition(index: index, around: anchor, radius: radius * 0.50))
+                    .accessibilityHidden(true)
             }
 
             Button {
@@ -188,6 +206,9 @@ struct MemoryConstellationCanvasView: View {
                 hoverCluster(updatedFocus)
             }
             .opacity(opacity)
+            .accessibilityLabel(Text("\(cluster.title) cluster"))
+            .accessibilityValue(Text("\(cluster.itemCount) memories\(focused ? ", focused" : "")"))
+            .accessibilityHint(Text("Select to focus this cluster in the constellation."))
         }
         .opacity(opacity)
     }
@@ -214,6 +235,7 @@ struct MemoryConstellationCanvasView: View {
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
         .frame(maxWidth: 250, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private func point(for kind: MemoryConstellationClusterKind, size: CGSize) -> CGPoint {
@@ -261,6 +283,19 @@ struct MemoryConstellationCanvasView: View {
         return values[(index * 3) % values.count]
     }
 
+    private var focusAccessibilityKey: String {
+        switch focus {
+        case .overview:
+            return "overview"
+        case .cluster(let cluster):
+            return "cluster:\(cluster.rawValue)"
+        case .bridge(let id):
+            return "bridge:\(id.uuidString)"
+        case .star(let id):
+            return "star:\(id.uuidString)"
+        }
+    }
+
     private func bridgeNarrative(for bridge: MemoryConstellationBridge) -> String {
         switch selectedViewMode {
         case .clusterMap:
@@ -270,6 +305,22 @@ struct MemoryConstellationCanvasView: View {
         case .timelineReplay:
             return "Replay thread"
         }
+    }
+
+    private func bridgeAccessibilityLabel(for bridge: MemoryConstellationBridge, focused: Bool) -> String {
+        let orderedTitles = orderedClusterTitles(for: bridge)
+        let focusState = focused ? "Focused. " : ""
+        return "\(focusState)\(bridge.label). \(bridgeNarrative(for: bridge)). Connects \(orderedTitles.0) and \(orderedTitles.1)."
+    }
+
+    private func orderedClusterTitles(for bridge: MemoryConstellationBridge) -> (String, String) {
+        let orderedKinds = MemoryConstellationClusterKind.allCases
+        let fromIndex = orderedKinds.firstIndex(of: bridge.from) ?? .max
+        let toIndex = orderedKinds.firstIndex(of: bridge.to) ?? .max
+        if fromIndex <= toIndex {
+            return (bridge.from.title, bridge.to.title)
+        }
+        return (bridge.to.title, bridge.from.title)
     }
 }
 

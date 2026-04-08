@@ -52,6 +52,9 @@ struct MemoryConstellationRelationshipTrayView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(card.accessibilityLabel))
+                            .accessibilityHint(Text(card.accessibilityHint))
                         }
                     }
                 }
