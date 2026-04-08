@@ -8,6 +8,8 @@ struct MemoryConstellationCanvasView: View {
     let hoverCluster: (MemoryConstellationClusterKind?) -> Void
     let focusBridge: (UUID?) -> Void
 
+    @State private var interactionState = MemoryConstellationClusterInteractionState()
+
     private let clusterAnchors: [MemoryConstellationClusterKind: UnitPoint] = [
         .vocabulary: UnitPoint(x: 0.24, y: 0.34),
         .style: UnitPoint(x: 0.74, y: 0.30),
@@ -55,6 +57,9 @@ struct MemoryConstellationCanvasView: View {
             .frame(minHeight: 470)
         }
         .accessibilityLabel(Text(snapshot.accessibilitySummary))
+        .onChange(of: focus) { newFocus in
+            interactionState.sync(with: newFocus)
+        }
     }
 
     private func ambientGrid(size: CGSize) -> some View {
@@ -153,7 +158,8 @@ struct MemoryConstellationCanvasView: View {
             }
 
             Button {
-                hoverCluster(focused ? nil : cluster.kind)
+                let updatedFocus = interactionState.clusterClicked(cluster.kind)
+                hoverCluster(updatedFocus)
             } label: {
                 VStack(spacing: 6) {
                     Text(cluster.title)
@@ -178,7 +184,8 @@ struct MemoryConstellationCanvasView: View {
             .buttonStyle(.plain)
             .position(x: anchor.x, y: anchor.y)
             .onHover { isHovering in
-                hoverCluster(isHovering ? cluster.kind : nil)
+                let updatedFocus = interactionState.hoverChanged(to: isHovering ? cluster.kind : nil)
+                hoverCluster(updatedFocus)
             }
             .opacity(opacity)
         }
@@ -263,5 +270,37 @@ struct MemoryConstellationCanvasView: View {
         case .timelineReplay:
             return "Replay thread"
         }
+    }
+}
+
+struct MemoryConstellationClusterInteractionState {
+    private var hoveredCluster: MemoryConstellationClusterKind?
+    private var committedCluster: MemoryConstellationClusterKind?
+
+    mutating func sync(with focus: MemoryConstellationFocus) {
+        switch focus {
+        case .cluster(let cluster):
+            if committedCluster == nil {
+                hoveredCluster = cluster
+            }
+        default:
+            hoveredCluster = nil
+            committedCluster = nil
+        }
+    }
+
+    mutating func hoverChanged(to cluster: MemoryConstellationClusterKind?) -> MemoryConstellationClusterKind? {
+        hoveredCluster = cluster
+        return effectiveClusterFocus
+    }
+
+    mutating func clusterClicked(_ cluster: MemoryConstellationClusterKind) -> MemoryConstellationClusterKind? {
+        committedCluster = cluster
+        hoveredCluster = cluster
+        return effectiveClusterFocus
+    }
+
+    private var effectiveClusterFocus: MemoryConstellationClusterKind? {
+        committedCluster ?? hoveredCluster
     }
 }

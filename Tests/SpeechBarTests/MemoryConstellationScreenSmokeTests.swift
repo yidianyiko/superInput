@@ -8,6 +8,15 @@ import Testing
 @Suite("MemoryConstellationScreenSmoke")
 struct MemoryConstellationScreenSmokeTests {
     @Test
+    func clusterInteractionStateKeepsClickedFocusAfterHoverExit() {
+        var interaction = MemoryConstellationClusterInteractionState()
+
+        #expect(interaction.hoverChanged(to: .vocabulary) == .vocabulary)
+        #expect(interaction.clusterClicked(.vocabulary) == .vocabulary)
+        #expect(interaction.hoverChanged(to: nil) == .vocabulary)
+    }
+
+    @Test
     @MainActor
     func screenRendersInsideHostingView() async throws {
         let defaults = UserDefaults(suiteName: "MemoryConstellationScreenSmoke.screen.\(UUID().uuidString)")!

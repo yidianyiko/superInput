@@ -110,6 +110,14 @@ enum OffscreenHomeSnapshotRenderer {
 
         let environment = SnapshotEnvironment(defaults: defaultsContext.defaults, command: command)
 
+        if command.section == .memory {
+            waitForMainActorTask {
+                await preloadMemoryConstellation(reload: {
+                    await environment.memoryConstellationStore.reload()
+                })
+            }
+        }
+
         let rootView = HomeWindowView(
             coordinator: environment.coordinator,
             agentMonitorCoordinator: environment.agentMonitorCoordinator,
@@ -149,6 +157,27 @@ enum OffscreenHomeSnapshotRenderer {
         )
         try data.write(to: outputURL, options: .atomic)
         print(outputURL.path)
+    }
+
+    static func preloadMemoryConstellation(
+        reload: @escaping @Sendable () async -> Void
+    ) async {
+        await reload()
+    }
+
+    private static func waitForMainActorTask(
+        _ operation: @escaping @Sendable () async -> Void
+    ) {
+        let semaphore = DispatchSemaphore(value: 0)
+
+        Task {
+            await operation()
+            semaphore.signal()
+        }
+
+        while semaphore.wait(timeout: .now()) == .timedOut {
+            RunLoop.main.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+        }
     }
 }
 
