@@ -44,6 +44,8 @@ public actor OpenAIResponsesTranscriptPostProcessor: TranscriptPostProcessor {
             "只做轻润色，尽量贴近原话。"
         case .chat:
             "整理成更自然的聊天表达，但不要改变原意。"
+        case .reply:
+            "整理成可以直接发送的聊天回复，像本人会发出去的话，简洁自然，不要加标题、解释或项目符号。"
         }
 
         let instructions = """
@@ -276,6 +278,8 @@ public actor OpenAIResponsesTranscriptPostProcessor: TranscriptPostProcessor {
             return min(max(Int(Double(count) * 1.15) + 32, 96), 320)
         case .chat:
             return min(max(Int(Double(count) * 1.35) + 48, 128), 420)
+        case .reply:
+            return min(max(Int(Double(count) * 1.2) + 48, 128), 360)
         }
     }
 

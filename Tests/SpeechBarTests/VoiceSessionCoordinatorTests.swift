@@ -428,6 +428,60 @@ struct VoiceSessionCoordinatorTests {
 
     @Test
     @MainActor
+    func replyModeAllowsReadyToSendRewrite() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let postProcessor = MockTranscriptPostProcessor()
+        let rawTranscript = "你先看一下这个方案要是可以的话回我一下"
+        let polishedTranscript = "收到，你先看一下方案，如果可以的话回我一下。"
+        postProcessor.polishedText = polishedTranscript
+        let userProfileProvider = MockUserProfileContextProvider(
+            context: UserProfileContext(
+                profession: "创业者",
+                memoryProfile: "偏好：像本人一样回消息",
+                terminologyGlossary: [],
+                polishMode: .reply
+            )
+        )
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            userProfileProvider: userProfileProvider,
+            transcriptPostProcessor: postProcessor,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        audio.emit(AudioChunk(data: Data([0x01, 0x02]), format: .deepgramLinear16, sequenceNumber: 0))
+
+        client.emit(.final(rawTranscript))
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventually {
+            coordinator.sessionState == .idle && coordinator.finalTranscript == polishedTranscript
+        }
+
+        let published = await publisher.snapshot()
+        #expect(published.map(\.text) == [polishedTranscript])
+        #expect(postProcessor.receivedContexts.last?.polishMode == .reply)
+    }
+
+    @Test
+    @MainActor
     func successfulPublishRecordsObservedInputEvent() async throws {
         let hardware = MockHardwareEventSource()
         let audio = MockAudioInputSource()
@@ -586,6 +640,61 @@ struct VoiceSessionCoordinatorTests {
 
         try await eventually { !postProcessor.receivedContexts.isEmpty }
         #expect(postProcessor.receivedContexts.last?.memoryProfile.contains("tone=polite") == true)
+    }
+
+    @Test
+    @MainActor
+    func activeInputHintsSurfaceProfileGlossaryAndRecallSignals() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let retriever = MockMemoryRetriever(
+            bundle: RecallBundle(
+                vocabularyHints: ["Demo Day"],
+                correctionHints: [],
+                styleHints: ["brevity=short"],
+                sceneHints: [],
+                diagnosticSummary: "test"
+            )
+        )
+        let snapshotProvider = MockFocusedInputSnapshotProvider()
+        let userProfileProvider = MockUserProfileContextProvider(
+            context: UserProfileContext(
+                profession: "AI 创业者",
+                memoryProfile: "偏好：结论先行\n偏好：自然一点，不要太正式",
+                terminologyGlossary: [
+                    TerminologyEntry(term: "Redheak", isEnabled: true)
+                ],
+                polishMode: .reply
+            )
+        )
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            focusedSnapshotProvider: snapshotProvider,
+            userProfileProvider: userProfileProvider,
+            memoryRetriever: retriever,
+            sleepClock: ImmediateSleepClock(),
+            memoryRecallEnabled: { true }
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording && !coordinator.activeInputHints.isEmpty
+        }
+
+        #expect(coordinator.activeInputHints.contains("风格·结论先行"))
+        #expect(coordinator.activeInputHints.contains("术语·Redheak"))
+        #expect(coordinator.activeInputHints.contains("术语·Demo Day"))
+        #expect(coordinator.activeInputHints.contains("风格·简短"))
     }
 }
 

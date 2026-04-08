@@ -150,6 +150,20 @@ final class UserProfileStore: ObservableObject, UserProfileContextProviding, @un
         terminologyGlossary.removeAll { $0.id == id }
     }
 
+    func applyReplyDemoSeedPack() {
+        profession = "AI 创业者"
+        memoryProfile = Self.replyDemoMemoryProfile
+        terminologyGlossary = Self.replyDemoGlossary
+        isTerminologyGlossaryEnabled = true
+        polishMode = .reply
+        skipShortPolish = false
+        shortPolishCharacterThreshold = 4
+        useClipboardContextForPolish = false
+        useFrontmostAppContextForPolish = true
+        polishTimeoutSeconds = 1.8
+        terminologyStatusMessage = "已载入 Demo Seed Pack。"
+    }
+
     private func bindPersistence() {
         $profession
             .dropFirst()
@@ -320,6 +334,19 @@ final class UserProfileStore: ObservableObject, UserProfileContextProviding, @un
     private static func clampPolishTimeoutSeconds(_ value: Double) -> Double {
         min(max(value, 1.0), 5.0)
     }
+
+    private static let replyDemoMemoryProfile = """
+    偏好：结论先行
+    偏好：自然一点，不要太正式
+    场景：适合直接发给同事或合作伙伴
+    """
+
+    private static let replyDemoGlossary: [TerminologyEntry] = [
+        TerminologyEntry(term: "Redheak", isEnabled: true),
+        TerminologyEntry(term: "Demo Day", isEnabled: true),
+        TerminologyEntry(term: "OpenAI API", isEnabled: true),
+        TerminologyEntry(term: "飞书", isEnabled: true)
+    ]
 
     private enum Keys {
         static let profession = "profile.profession"

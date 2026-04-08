@@ -168,6 +168,7 @@ public enum TranscriptPolishMode: String, Sendable, Equatable, Codable, CaseIter
     case off
     case light
     case chat
+    case reply
 }
 
 public struct UserProfileContext: Sendable, Equatable, Codable {

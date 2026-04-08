@@ -34,6 +34,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     @Published public private(set) var overlayPhase: RecordingOverlayPhase = .hidden
     @Published public private(set) var overlaySubtitle = ""
     @Published public private(set) var audioLevelWindow: [AudioLevelSample] = []
+    @Published public private(set) var activeInputHints: [String] = []
 
     private let hardwareSource: any HardwareEventSource
     private let audioInputSource: any AudioInputSource
@@ -268,6 +269,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         finalTranscript = ""
         lastPolishFallbackReason = nil
         activeRecallBundle = nil
+        activeInputHints = []
         statusMessage = "Preparing microphone..."
         isPushToTalkActive = true
         sessionState = .requestingPermission
@@ -300,6 +302,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
 
         let context = await currentUserProfileContext()
         activeRecallBundle = await currentRecallBundle()
+        activeInputHints = makeActiveInputHints(context: context, recall: activeRecallBundle)
         let sessionConfiguration = makeSessionConfiguration(context: context, recall: activeRecallBundle)
 
         do {
@@ -554,6 +557,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         overlayPhase = .failed
         overlaySubtitle = message
         audioLevelWindow = []
+        activeInputHints = []
     }
 
     private func teardownActiveSession() async {
@@ -585,6 +589,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         interimTranscript = ""
         finalTranscript = ""
         lastPolishFallbackReason = nil
+        activeInputHints = []
         sessionState = .idle
         overlayPhase = .hidden
         overlaySubtitle = ""
@@ -660,6 +665,94 @@ public final class VoiceSessionCoordinator: ObservableObject {
         let prefix = updated.memoryProfile.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.memoryProfile = prefix.isEmpty ? additions : "\(prefix)\n\n\(additions)"
         return updated
+    }
+
+    private func makeActiveInputHints(
+        context: UserProfileContext,
+        recall: RecallBundle?
+    ) -> [String] {
+        var hints: [String] = []
+        var seen = Set<String>()
+
+        func append(_ value: String) {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return }
+            guard seen.insert(trimmed.lowercased()).inserted else { return }
+            hints.append(trimmed)
+        }
+
+        for hint in profileHints(from: context.memoryProfile).prefix(2) {
+            append("风格·\(hint)")
+        }
+
+        if context.isTerminologyGlossaryEnabled {
+            for term in context.terminologyGlossary where term.isEnabled {
+                append("术语·\(term.term)")
+                if hints.count >= 6 {
+                    return Array(hints.prefix(6))
+                }
+            }
+        }
+
+        guard let recall else {
+            return Array(hints.prefix(6))
+        }
+
+        for term in recall.vocabularyHints.prefix(2) {
+            append("术语·\(term)")
+        }
+
+        for hint in recall.styleHints.prefix(2) {
+            append(displayHint(forStyleHint: hint))
+        }
+
+        for hint in recall.sceneHints.prefix(1) {
+            append("场景·\(hint)")
+        }
+
+        return Array(hints.prefix(6))
+    }
+
+    private func profileHints(from memoryProfile: String) -> [String] {
+        memoryProfile
+            .split(whereSeparator: \.isNewline)
+            .map { line in
+                line
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .trimmingCharacters(in: CharacterSet(charactersIn: "-•"))
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .compactMap { line in
+                let prefixes = ["偏好：", "偏好:", "风格：", "风格:"]
+                for prefix in prefixes where line.hasPrefix(prefix) {
+                    let value = line.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+                    return value.isEmpty ? nil : value
+                }
+                return nil
+            }
+    }
+
+    private func displayHint(forStyleHint hint: String) -> String {
+        let trimmed = hint.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "brevity=short" {
+            return "风格·简短"
+        }
+        if trimmed == "brevity=long" {
+            return "风格·展开"
+        }
+        if trimmed == "tone=polite" {
+            return "风格·礼貌"
+        }
+        if trimmed == "tone=casual" {
+            return "风格·自然"
+        }
+        if trimmed.hasPrefix("tone=") {
+            return "风格·" + trimmed.replacingOccurrences(of: "tone=", with: "")
+        }
+        if trimmed.hasPrefix("brevity=") {
+            return "风格·" + trimmed.replacingOccurrences(of: "brevity=", with: "")
+        }
+        return "风格·\(trimmed)"
     }
 
     private func currentRecallBundle() async -> RecallBundle? {
@@ -800,6 +893,12 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 minimumLengthRatio: 0.45,
                 maximumLengthRatio: 2.0,
                 minimumSimilarity: 0.45
+            )
+        case .reply:
+            PolishValidationPolicy(
+                minimumLengthRatio: 0.4,
+                maximumLengthRatio: 1.9,
+                minimumSimilarity: 0.42
             )
         }
     }

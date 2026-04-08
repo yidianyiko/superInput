@@ -228,6 +228,22 @@ struct StatusPanelView: View {
                     text: coordinator.finalTranscript,
                     placeholder: "结束录音后显示最终文本。"
                 )
+
+                if !coordinator.activeInputHints.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("本次记忆提示")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(coordinator.activeInputHints, id: \.self) { hint in
+                                    SmallTag(title: "记忆", value: hint, tint: palette.highlight)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -359,26 +375,36 @@ struct StatusPanelView: View {
                     Picker("润色模式", selection: $userProfileStore.polishMode) {
                         Text("轻润色").tag(TranscriptPolishMode.light)
                         Text("聊天表达").tag(TranscriptPolishMode.chat)
+                        Text("回复模式").tag(TranscriptPolishMode.reply)
                     }
                     .pickerStyle(.segmented)
 
                     Text(
-                        userProfileStore.skipShortPolish
-                            ? "短句会直接跳过润色，当前阈值：\(userProfileStore.shortPolishCharacterThreshold) 个有效字符。"
-                            : "所有句子都会尝试润色，适合你更在意表达统一的时候。"
+                        polishDescription
                     )
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                 } else {
                     Text("关闭后会直接使用原始转写，速度最快。")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
                 }
 
-                if let openHomeAction {
-                    Button("打开主页调整策略", action: openHomeAction)
-                        .buttonStyle(StatusSecondaryButtonStyle(palette: palette))
+                HStack(spacing: 8) {
+                    Button("载入 Demo Seed Pack") {
+                        userProfileStore.applyReplyDemoSeedPack()
+                    }
+                    .buttonStyle(StatusPrimaryButtonStyle(palette: palette))
+
+                    if let openHomeAction {
+                        Button("打开主页调整策略", action: openHomeAction)
+                            .buttonStyle(StatusSecondaryButtonStyle(palette: palette))
+                    }
                 }
+
+                Text(userProfileStore.terminologyStatusMessage)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -484,6 +510,23 @@ struct StatusPanelView: View {
             return "轻润色"
         case .chat:
             return "聊天表达"
+        case .reply:
+            return "回复模式"
+        }
+    }
+
+    private var polishDescription: String {
+        switch userProfileStore.polishMode {
+        case .off:
+            return "关闭后会直接使用原始转写，速度最快。"
+        case .light:
+            return userProfileStore.skipShortPolish
+                ? "短句会直接跳过润色，当前阈值：\(userProfileStore.shortPolishCharacterThreshold) 个有效字符。"
+                : "所有句子都会尝试轻润色。"
+        case .chat:
+            return "会把口语整理成更顺口的聊天表达，但仍尽量保留原意。"
+        case .reply:
+            return "会把你的口语意图整理成可直接发送的回复，并带入当前 persona 和记忆提示。"
         }
     }
 

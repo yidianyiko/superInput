@@ -621,14 +621,11 @@ struct HomeWindowView: View {
                         Picker("润色模式", selection: $userProfileStore.polishMode) {
                             Text("轻润色").tag(TranscriptPolishMode.light)
                             Text("聊天表达").tag(TranscriptPolishMode.chat)
+                            Text("回复模式").tag(TranscriptPolishMode.reply)
                         }
                         .pickerStyle(.segmented)
 
-                        Text(
-                            userProfileStore.polishMode == .light
-                                ? "轻润色会尽量贴近原话，只修正明显识别错误、重复和标点。"
-                                : "聊天表达会更顺口，适合直接发给同事或 AI，但仍会保留原意。"
-                        )
+                        Text(polishModeDescription)
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
 
@@ -1082,6 +1079,19 @@ struct HomeWindowView: View {
             return "\(Int(value)) 秒"
         }
         return String(format: "%.1f 秒", value)
+    }
+
+    private var polishModeDescription: String {
+        switch userProfileStore.polishMode {
+        case .off:
+            return "关闭后将直接使用原始转写结果。"
+        case .light:
+            return "轻润色会尽量贴近原话，只修正明显识别错误、重复和标点。"
+        case .chat:
+            return "聊天表达会更顺口，适合直接发给同事或 AI，但仍会保留原意。"
+        case .reply:
+            return "回复模式会把口语意图整理成可直接发送的消息，更像你本人平时会发出去的话。"
+        }
     }
 
     private var transportStatusTitle: String {
