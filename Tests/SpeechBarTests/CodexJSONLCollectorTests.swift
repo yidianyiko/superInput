@@ -72,7 +72,7 @@ private func makeCodexRolloutFile(baseDirectory: URL, date: Date) throws -> URL 
         .appendingPathComponent(String(format: "%02d", components.month ?? 1), isDirectory: true)
         .appendingPathComponent(String(format: "%02d", components.day ?? 1), isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: nil)
-    return directory.appendingPathComponent("rollout-2026-04-05T10-10-10-00000000-0000-0000-0000-000000000000.jsonl")
+    return directory.appendingPathComponent("rollout-sample-00000000-0000-0000-0000-000000000000.jsonl")
 }
 
 private func temporaryDirectory() -> URL {

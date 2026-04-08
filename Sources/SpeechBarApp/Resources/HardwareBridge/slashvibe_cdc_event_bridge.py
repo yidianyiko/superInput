@@ -32,11 +32,14 @@ EVENT_KIND_MAP = {
     proto.INPUT_EVENT_PUSH_TO_TALK_RELEASED: "pushToTalkReleased",
     proto.INPUT_EVENT_ROTATE_NEXT: "rotaryClockwise",
     proto.INPUT_EVENT_ROTATE_PREVIOUS: "rotaryCounterClockwise",
+<<<<<<< HEAD
     proto.INPUT_EVENT_PRESS_PRIMARY: "pressPrimary",
     proto.INPUT_EVENT_PRESS_SECONDARY: "pressSecondary",
     proto.INPUT_EVENT_DISMISS_SELECTED: "dismissSelected",
     proto.INPUT_EVENT_SWITCH_BOARD_NEXT: "switchBoardNext",
     proto.INPUT_EVENT_SWITCH_BOARD_PREVIOUS: "switchBoardPrevious",
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 }
 
 
@@ -124,7 +127,10 @@ def main() -> int:
     sequence = 1
     next_hello_at = 0.0
     read_buffer = bytearray()
+<<<<<<< HEAD
     ptt_toggle_on = False  # toggle: False=mic off, True=mic on
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 
     with serial_port:
         while True:
@@ -162,6 +168,7 @@ def main() -> int:
                     continue
 
                 event_code = message.payload[0]
+<<<<<<< HEAD
 
                 # KEY3 (code=8) and KEY1 press (code=6) toggle mic on/off
                 if event_code in (proto.INPUT_EVENT_PUSH_TO_TALK_PRESSED,
@@ -174,6 +181,8 @@ def main() -> int:
                 if event_code == proto.INPUT_EVENT_PUSH_TO_TALK_RELEASED:
                     continue
 
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
                 kind = EVENT_KIND_MAP.get(event_code)
                 if kind is None:
                     continue

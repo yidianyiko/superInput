@@ -74,6 +74,9 @@ let package = Package(
                 "MemoryStorageSQLite",
                 "SpeechBarApplication",
                 "SpeechBarInfrastructure"
+            ],
+            resources: [
+                .copy("Resources/HardwareBridge")
             ]
         ),
         .testTarget(

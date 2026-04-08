@@ -192,6 +192,7 @@ public final class BoardEventFileHardwareEventSource: HardwareEventSource, @unch
             return .rotaryClockwise
         case "rotaryCounterClockwise":
             return .rotaryCounterClockwise
+<<<<<<< HEAD
         case "pressPrimary":
             return .pressPrimary
         case "pressSecondary":
@@ -202,6 +203,8 @@ public final class BoardEventFileHardwareEventSource: HardwareEventSource, @unch
             return .switchBoardNext
         case "switchBoardPrevious":
             return .switchBoardPrevious
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         default:
             return nil
         }

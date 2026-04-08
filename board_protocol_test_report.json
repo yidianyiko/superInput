@@ -1,0 +1,29 @@
+{
+  "port": "/dev/cu.usbmodem3175334B31331",
+  "baudrate": 230400,
+  "started_at": "2026-04-08T16:00:56Z",
+  "passed": false,
+  "checks": [
+    {
+      "name": "handshake",
+      "passed": true,
+      "details": "收到 DEVICE_INFO seq=[1, 2, 3, 4]",
+      "observed": {
+        "device_info_seq": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "name": "input_event_push",
+      "passed": false,
+      "details": "未在等待窗口内收到期望的 INPUT_EVENT_PUSH",
+      "observed": {
+        "events": []
+      }
+    }
+  ]
+}

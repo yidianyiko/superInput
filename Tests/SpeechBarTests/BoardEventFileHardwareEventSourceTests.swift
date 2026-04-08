@@ -38,6 +38,7 @@ struct BoardEventFileHardwareEventSourceTests {
         #expect(event?.kind == .pushToTalkPressed)
         #expect(event?.source == .usbHID)
     }
+<<<<<<< HEAD
 
     @Test
     func boardSpecificEventKindsAreDecodedFromJSONL() async throws {
@@ -86,4 +87,6 @@ struct BoardEventFileHardwareEventSourceTests {
         ])
         #expect(events.allSatisfy { $0.source == .usbHID })
     }
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 }

@@ -18,7 +18,10 @@ private func boardBridgeDebugLog(_ message: String) {
 
 final class BoardInputBridgeController: @unchecked Sendable {
     private static let preferredPortDefaultsKey = "board.input.preferredSerialPort"
+<<<<<<< HEAD
     private static let preferredPythonEnvKey = "SLASHVIBE_PYTHON_EXECUTABLE"
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 
     private let defaults: UserDefaults
     private let fileManager: FileManager
@@ -113,6 +116,7 @@ final class BoardInputBridgeController: @unchecked Sendable {
         fileManager.createFile(atPath: rawCaptureURL.path, contents: Data())
 
         let scriptURLs = try prepareBridgeScripts()
+<<<<<<< HEAD
         let pythonExecutable = resolvedPythonExecutable()
         let process = Process()
         let stdoutPipe = Pipe()
@@ -120,6 +124,15 @@ final class BoardInputBridgeController: @unchecked Sendable {
         process.executableURL = URL(fileURLWithPath: pythonExecutable)
         process.currentDirectoryURL = scriptsRuntimeDirectory
         process.arguments = [
+=======
+        let process = Process()
+        let stdoutPipe = Pipe()
+        let stderrPipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.currentDirectoryURL = scriptsRuntimeDirectory
+        process.arguments = [
+            "python3",
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
             "-u",
             scriptURLs.bridge.path,
             "--port", portPath,
@@ -129,6 +142,7 @@ final class BoardInputBridgeController: @unchecked Sendable {
             "--source", "usbHID",
             "--hello-interval", "0.8"
         ]
+<<<<<<< HEAD
         process.environment = pythonEnvironment(vendorURL: scriptURLs.vendor)
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
@@ -136,6 +150,12 @@ final class BoardInputBridgeController: @unchecked Sendable {
         boardBridgeDebugLog(
             "launching CDC bridge on port=\(portPath), python=\(pythonExecutable), rawCapture=\(rawCaptureURL.path)"
         )
+=======
+        process.standardOutput = stdoutPipe
+        process.standardError = stderrPipe
+
+        boardBridgeDebugLog("launching CDC bridge on port=\(portPath), rawCapture=\(rawCaptureURL.path)")
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         try process.run()
         currentProcess = process
         lastReportedPort = portPath
@@ -183,12 +203,19 @@ final class BoardInputBridgeController: @unchecked Sendable {
         }
     }
 
+<<<<<<< HEAD
     private func prepareBridgeScripts() throws -> (bridge: URL, proto: URL, vendor: URL) {
+=======
+    private func prepareBridgeScripts() throws -> (bridge: URL, proto: URL) {
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         try fileManager.createDirectory(at: scriptsRuntimeDirectory, withIntermediateDirectories: true)
 
         let bridgeURL = scriptsRuntimeDirectory.appendingPathComponent("slashvibe_cdc_event_bridge.py")
         let protoURL = scriptsRuntimeDirectory.appendingPathComponent("slashvibe_host_proto.py")
+<<<<<<< HEAD
         let vendorURL = scriptsRuntimeDirectory.appendingPathComponent("python_vendor", isDirectory: true)
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 
         try copyBridgeResource(
             named: "slashvibe_cdc_event_bridge",
@@ -200,12 +227,17 @@ final class BoardInputBridgeController: @unchecked Sendable {
             extension: "py",
             to: protoURL
         )
+<<<<<<< HEAD
         try copyBridgeDirectory(
             named: "python_vendor",
             to: vendorURL
         )
 
         return (bridgeURL, protoURL, vendorURL)
+=======
+
+        return (bridgeURL, protoURL)
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
     }
 
     private func copyBridgeResource(
@@ -231,6 +263,7 @@ final class BoardInputBridgeController: @unchecked Sendable {
         try fileManager.copyItem(at: sourceURL, to: destinationURL)
     }
 
+<<<<<<< HEAD
     private func copyBridgeDirectory(
         named resourceName: String,
         to destinationURL: URL
@@ -287,6 +320,8 @@ final class BoardInputBridgeController: @unchecked Sendable {
         return environment
     }
 
+=======
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
     private func preferredSerialPortPath() -> String? {
         if let envPort = ProcessInfo.processInfo.environment["SLASHVIBE_BOARD_PORT"]?
             .trimmingCharacters(in: .whitespacesAndNewlines),

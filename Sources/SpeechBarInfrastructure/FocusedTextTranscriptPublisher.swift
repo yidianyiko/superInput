@@ -40,6 +40,7 @@ public enum FocusedTextTranscriptPublisherError: LocalizedError {
 
 public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @unchecked Sendable {
     fileprivate static let pasteKeyCode: CGKeyCode = 9
+    fileprivate static let deleteKeyCode: CGKeyCode = 51
     fileprivate static let syntheticMarker: Int64 = 0x53504253
     private static let duplicateSuppressionWindow: TimeInterval = 1.0
     private static let activationSettlingDelay: Duration = .milliseconds(80)
@@ -48,6 +49,7 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
     private let applicationTracker: FrontmostApplicationTracker
     private var rememberedTarget: CapturedFocusTarget?
     private var lastSuccessfulPublish: SuccessfulPublish?
+    private var activeStreamingSession: ActiveStreamingSession?
 
     public init(
         applicationTracker: FrontmostApplicationTracker,
@@ -164,6 +166,143 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
         }
 
         throw FocusedTextTranscriptPublisherError.insertionFailed
+    }
+
+    public func beginStreamingSession() async {
+        let target = await MainActor.run {
+            rememberedTarget ?? captureFocusTarget()
+        }
+        let fallbackProcessIdentifier = await MainActor.run {
+            applicationTracker.lastExternalProcessIdentifier()
+        }
+        let processIdentifier = target?.processIdentifier ?? fallbackProcessIdentifier
+
+        if let processIdentifier {
+            let activated = await MainActor.run {
+                applicationTracker.activate(processIdentifier: processIdentifier)
+            }
+            if activated {
+                await waitForTargetApplicationToBecomeFrontmost(processIdentifier: processIdentifier)
+            }
+        }
+
+        await MainActor.run {
+            activeStreamingSession = ActiveStreamingSession(
+                target: target,
+                processIdentifier: processIdentifier,
+                committedText: ""
+            )
+        }
+    }
+
+    public func updateStreamingTranscript(_ text: String) async throws -> TranscriptDeliveryOutcome {
+        let normalized = Self.normalizeStreamingText(text)
+        guard !normalized.isEmpty else {
+            return .publishedOnly
+        }
+
+        let session = await MainActor.run {
+            if let activeStreamingSession {
+                return activeStreamingSession
+            }
+            let target = rememberedTarget ?? captureFocusTarget()
+            let fallbackProcessIdentifier = applicationTracker.lastExternalProcessIdentifier()
+            let createdSession = ActiveStreamingSession(
+                target: target,
+                processIdentifier: target?.processIdentifier ?? fallbackProcessIdentifier,
+                committedText: ""
+            )
+            activeStreamingSession = createdSession
+            return createdSession
+        }
+
+        let oldCharacters = Array(session.committedText)
+        let newCharacters = Array(normalized)
+        var prefixLength = 0
+        while prefixLength < oldCharacters.count,
+              prefixLength < newCharacters.count,
+              oldCharacters[prefixLength] == newCharacters[prefixLength] {
+            prefixLength += 1
+        }
+
+        let deleteCount = oldCharacters.count - prefixLength
+        let suffix = String(newCharacters.dropFirst(prefixLength))
+
+        guard deleteCount > 0 || !suffix.isEmpty else {
+            return .publishedOnly
+        }
+
+        let preferredTarget = session.target
+        let processIdentifier = session.processIdentifier
+        let activated = await MainActor.run {
+            if let processIdentifier {
+                return applicationTracker.activate(processIdentifier: processIdentifier)
+            }
+            return applicationTracker.activateLastExternalApplication()
+        }
+        if activated {
+            await waitForTargetApplicationToBecomeFrontmost(processIdentifier: processIdentifier)
+        }
+
+        if let preferredTarget {
+            let restored = await MainActor.run {
+                restoreFocus(to: preferredTarget)
+            }
+            debugLog("streaming restoreFocus result = \(restored), pid = \(preferredTarget.processIdentifier)")
+            if restored {
+                try? await Task.sleep(for: Self.restoredFocusSettlingDelay)
+            }
+        }
+
+        if deleteCount > 0 {
+            guard await MainActor.run(body: {
+                postDeleteBackward(count: deleteCount, processIdentifier: processIdentifier)
+            }) else {
+                throw FocusedTextTranscriptPublisherError.insertionFailed
+            }
+        }
+
+        let outcome: TranscriptDeliveryOutcome
+        if suffix.isEmpty {
+            outcome = .typedIntoFocusedApp
+        } else if await pasteIntoFocusedApplication(
+            suffix,
+            preferredTarget: preferredTarget,
+            targetProcessIdentifier: processIdentifier
+        ) {
+            outcome = .typedIntoFocusedApp
+        } else {
+            throw FocusedTextTranscriptPublisherError.insertionFailed
+        }
+
+        await MainActor.run {
+            activeStreamingSession = ActiveStreamingSession(
+                target: preferredTarget,
+                processIdentifier: processIdentifier,
+                committedText: normalized
+            )
+        }
+        return outcome
+    }
+
+    public func finishStreamingSession(finalText: String) async throws -> TranscriptDeliveryOutcome {
+        let normalized = Self.normalizeStreamingText(finalText)
+        defer {
+            Task { @MainActor in
+                self.activeStreamingSession = nil
+            }
+        }
+
+        guard !normalized.isEmpty else {
+            return .publishedOnly
+        }
+        return try await updateStreamingTranscript(normalized)
+    }
+
+    public func cancelStreamingSession() async {
+        await MainActor.run {
+            activeStreamingSession = nil
+        }
     }
 
     @MainActor
@@ -593,6 +732,7 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
     }
 
     @MainActor
+<<<<<<< HEAD
     private func snapshot(for target: CapturedFocusTarget) -> FocusedInputSnapshot? {
         guard let element = target.element else {
             return nil
@@ -797,10 +937,68 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
             elementFrame: elementFrame,
             destinationPoint: resolvedGeometry.destinationPoint
         )
+=======
+    private func postDeleteBackward(count: Int, processIdentifier: pid_t?) -> Bool {
+        guard count > 0 else { return true }
+
+        var posted = false
+        if let source = CGEventSource(stateID: .combinedSessionState) ?? CGEventSource(stateID: .hidSystemState) {
+            for _ in 0..<count {
+                guard
+                    let keyDown = CGEvent(keyboardEventSource: source, virtualKey: Self.deleteKeyCode, keyDown: true),
+                    let keyUp = CGEvent(keyboardEventSource: source, virtualKey: Self.deleteKeyCode, keyDown: false)
+                else {
+                    return false
+                }
+                keyDown.setIntegerValueField(CGEventField.eventSourceUserData, value: Self.syntheticMarker)
+                keyUp.setIntegerValueField(CGEventField.eventSourceUserData, value: Self.syntheticMarker)
+                keyDown.post(tap: .cghidEventTap)
+                keyUp.post(tap: .cghidEventTap)
+            }
+            posted = true
+        }
+
+        if posted {
+            return true
+        }
+
+        guard let processIdentifier,
+              let postKeyboardEvent = loadAXPostKeyboardEvent()
+        else {
+            return false
+        }
+
+        let applicationElement = AXUIElementCreateApplication(processIdentifier)
+        for _ in 0..<count {
+            let down = postKeyboardEvent(
+                applicationElement,
+                127,
+                Self.deleteKeyCode,
+                DarwinBoolean(true)
+            )
+            let up = postKeyboardEvent(
+                applicationElement,
+                127,
+                Self.deleteKeyCode,
+                DarwinBoolean(false)
+            )
+            if down != .success || up != .success {
+                return false
+            }
+        }
+        return true
+    }
+
+    private static func normalizeStreamingText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
     }
 
 }
 
+extension FocusedTextTranscriptPublisher: StreamingTranscriptPublisher {}
 extension FocusedTextTranscriptPublisher: TranscriptTargetCapturing {}
 extension FocusedTextTranscriptPublisher: FocusedInputSnapshotProviding {
     public func currentFocusedInputSnapshot() async -> FocusedInputSnapshot? {
@@ -869,6 +1067,13 @@ private struct SuccessfulPublish {
     let text: String
     let processIdentifier: pid_t?
     let occurredAt: Date
+}
+
+@MainActor
+private struct ActiveStreamingSession {
+    let target: CapturedFocusTarget?
+    let processIdentifier: pid_t?
+    let committedText: String
 }
 
 private typealias AXPostKeyboardEventFunction =

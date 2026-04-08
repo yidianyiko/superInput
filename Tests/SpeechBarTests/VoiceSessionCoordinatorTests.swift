@@ -231,10 +231,39 @@ struct VoiceSessionCoordinatorTests {
 
         try await eventually {
             if case .failed(let message) = coordinator.sessionState {
-                return message == "Microphone permission is required."
+                return message == "需要授予麦克风权限。"
             }
             return false
         }
+    }
+
+    @Test
+    @MainActor
+    func startsCaptureBeforeLoadingCredentials() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let publisher = MockTranscriptPublisher()
+        let credentials = StartCaptureOrderCredentialProvider(audio: audio)
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        #expect(credentials.sawStartedCaptureBeforeLoad)
+        #expect(audio.startCallCount == 1)
     }
 
     @Test
@@ -302,7 +331,7 @@ struct VoiceSessionCoordinatorTests {
 
         try await eventually {
             if case .failed(let message) = coordinator.sessionState {
-                return message == "No speech was detected. Try again."
+                return message == "没有检测到语音，请重试。"
             }
             return false
         }
@@ -1041,11 +1070,36 @@ private enum TestFailure: Error {
     case timeout
 }
 
+<<<<<<< HEAD
 private enum MockFailure: Error {
     case publish
 }
 
 @MainActor
+=======
+private final class StartCaptureOrderCredentialProvider: CredentialProvider, @unchecked Sendable {
+    private let audio: MockAudioInputSource
+    private(set) var sawStartedCaptureBeforeLoad = false
+
+    init(audio: MockAudioInputSource) {
+        self.audio = audio
+    }
+
+    func credentialStatus() -> CredentialStatus {
+        .available
+    }
+
+    func loadAPIKey() throws -> String {
+        sawStartedCaptureBeforeLoad = audio.startCallCount > 0
+        return "test-key"
+    }
+
+    func save(apiKey: String) throws {}
+
+    func deleteAPIKey() throws {}
+}
+
+>>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 private func eventually(
     timeout: Duration = .seconds(5),
     pollInterval: Duration = .milliseconds(20),

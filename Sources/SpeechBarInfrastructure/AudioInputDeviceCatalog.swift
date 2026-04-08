@@ -35,6 +35,20 @@ public enum AudioInputDeviceCatalog {
             }
     }
 
+    public static func fallbackInputDevice(avoidingUID avoidedUID: String?) -> AudioInputDeviceDescriptor? {
+        let normalizedAvoidedUID = avoidedUID?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let defaultDevice = defaultInputDevice(), defaultDevice.uid != normalizedAvoidedUID {
+            return defaultDevice
+        }
+
+        if let builtInDevice = builtInInputDevice(), builtInDevice.uid != normalizedAvoidedUID {
+            return builtInDevice
+        }
+
+        return availableInputDevices().first { $0.uid != normalizedAvoidedUID }
+    }
+
     public static func defaultInputDevice() -> AudioInputDeviceDescriptor? {
         guard
             let deviceID = defaultInputDeviceID(),
@@ -49,6 +63,20 @@ public enum AudioInputDeviceCatalog {
 
     public static func deviceID(forUID uid: String) -> AudioDeviceID? {
         allAudioDeviceIDs().first { deviceUID(for: $0) == uid }
+    }
+
+    public static func builtInInputDevice() -> AudioInputDeviceDescriptor? {
+        allAudioDeviceIDs().compactMap { deviceID -> AudioInputDeviceDescriptor? in
+            guard
+                hasInputChannels(deviceID),
+                deviceTransportType(for: deviceID) == kAudioDeviceTransportTypeBuiltIn,
+                let uid = deviceUID(for: deviceID),
+                let name = deviceName(for: deviceID)
+            else {
+                return nil
+            }
+            return AudioInputDeviceDescriptor(uid: uid, name: name)
+        }.first
     }
 
     private static func allAudioDeviceIDs() -> [AudioDeviceID] {
@@ -173,6 +201,14 @@ public enum AudioInputDeviceCatalog {
         )
     }
 
+    private static func deviceTransportType(for deviceID: AudioDeviceID) -> UInt32? {
+        readUInt32Property(
+            objectID: deviceID,
+            selector: kAudioDevicePropertyTransportType,
+            scope: kAudioObjectPropertyScopeGlobal
+        )
+    }
+
     private static func readStringProperty(
         objectID: AudioObjectID,
         selector: AudioObjectPropertySelector,
@@ -200,5 +236,34 @@ public enum AudioInputDeviceCatalog {
         }
 
         return value as String
+    }
+
+    private static func readUInt32Property(
+        objectID: AudioObjectID,
+        selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope
+    ) -> UInt32? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: scope,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        var value: UInt32 = 0
+        var dataSize = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(
+            objectID,
+            &address,
+            0,
+            nil,
+            &dataSize,
+            &value
+        )
+
+        guard status == noErr else {
+            return nil
+        }
+
+        return value
     }
 }
