@@ -149,19 +149,24 @@ final class RecordingOverlayController: NSObject {
 }
 
 private struct RecordingOverlayView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var coordinator: VoiceSessionCoordinator
 
     var body: some View {
-        Group {
-            if coordinator.overlayPhase == .recording {
-                recordingPill
-            } else {
-                statusPill
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !shouldAnimateTimeline)) { context in
+            let phase = shouldAnimateTimeline ? context.date.timeIntervalSinceReferenceDate : 0
+
+            Group {
+                if coordinator.overlayPhase == .recording {
+                    recordingPill(phase: phase)
+                } else {
+                    statusPill
+                }
             }
+            .frame(width: pillWidth, height: pillHeight)
+            .clipShape(Capsule(style: .continuous))
+            .background(Color.clear)
         }
-        .frame(width: pillWidth, height: pillHeight)
-        .clipShape(Capsule(style: .continuous))
-        .background(Color.clear)
     }
 
     private var title: String {
@@ -203,13 +208,39 @@ private struct RecordingOverlayView: View {
         }
     }
 
-    private var recordingPill: some View {
-        ZStack {
+    private var shouldAnimateTimeline: Bool {
+        coordinator.overlayPhase == .recording && !reduceMotion
+    }
+
+    private var recordingIntensity: Double {
+        RecordingOverlayMotion.audioIntensity(from: coordinator.audioLevelWindow)
+    }
+
+    private func recordingPill(phase: TimeInterval) -> some View {
+        let glowOpacity = RecordingOverlayMotion.edgeGlowOpacity(intensity: recordingIntensity)
+        let glowRadius = 4.5 + (recordingIntensity * 6.0)
+
+        return ZStack {
             Capsule(style: .continuous)
                 .fill(Color.black.opacity(0.95))
+                .overlay(recordingBackground(phase: phase))
                 .overlay(
                     Capsule(style: .continuous)
                         .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(
+                            Color(red: 0.58, green: 0.93, blue: 0.82).opacity(glowOpacity),
+                            lineWidth: 1.1
+                        )
+                        .blur(radius: glowRadius)
+                )
+                .shadow(
+                    color: Color(red: 0.48, green: 0.88, blue: 0.78).opacity(glowOpacity * 0.65),
+                    radius: glowRadius,
+                    x: 0,
+                    y: 0
                 )
 
             HStack(spacing: 10) {
@@ -234,6 +265,54 @@ private struct RecordingOverlayView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
+        }
+    }
+
+    private func recordingBackground(phase: TimeInterval) -> some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let nebulaOpacity = 0.16 + (recordingIntensity * 0.24)
+
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.11, green: 0.14, blue: 0.18).opacity(0.82),
+                        Color.black.opacity(0.30)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        Color(red: 0.60, green: 0.92, blue: 0.83).opacity(nebulaOpacity),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 4,
+                    endRadius: 64
+                )
+
+                ForEach(Array(RecordingOverlayMotion.ambientStars.enumerated()), id: \.offset) { item in
+                    let index = item.offset
+                    let star = item.element
+                    let offset = reduceMotion
+                        ? .zero
+                        : RecordingOverlayMotion.starOffset(index: index, phase: phase, intensity: recordingIntensity)
+                    let twinkle = (sin((phase * 1.45) + (star.seed * 2.2)) + 1) * 0.5
+                    let starOpacity = min(0.78, 0.20 + (recordingIntensity * 0.22) + (twinkle * 0.22))
+
+                    Circle()
+                        .fill(Color.white.opacity(starOpacity))
+                        .frame(width: star.size, height: star.size)
+                        .position(
+                            x: (star.x * size.width) + offset.width,
+                            y: (star.y * size.height) + offset.height
+                        )
+                }
+            }
+            .clipShape(Capsule(style: .continuous))
+            .allowsHitTesting(false)
         }
     }
 
