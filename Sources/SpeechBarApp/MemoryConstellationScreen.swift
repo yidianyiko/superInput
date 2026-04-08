@@ -47,12 +47,48 @@ struct MemoryConstellationScreen: View {
                 memoryFeatureFlagStore: memoryFeatureFlagStore
             )
         }
+        .padding(24)
+        .background(screenBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 28, x: 0, y: 16)
         .padding(2)
+        .environment(\.colorScheme, .dark)
         .task {
             await constellationStore.reload()
         }
         .onChange(of: memoryFeatureFlagStore.displayMode) { _ in
             constellationStore.refreshPresentation()
+        }
+    }
+
+    private var screenBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                .fill(MemoryConstellationTheme.canvasBackground)
+
+            RadialGradient(
+                colors: [
+                    MemoryConstellationTheme.clusterColor(for: .vocabulary).opacity(0.16),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 30,
+                endRadius: 320
+            )
+
+            RadialGradient(
+                colors: [
+                    MemoryConstellationTheme.clusterColor(for: .style).opacity(0.14),
+                    Color.clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 30,
+                endRadius: 300
+            )
         }
     }
 }

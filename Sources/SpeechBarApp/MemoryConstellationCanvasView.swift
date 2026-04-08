@@ -240,7 +240,25 @@ struct MemoryConstellationCanvasView: View {
 
     private func point(for kind: MemoryConstellationClusterKind, size: CGSize) -> CGPoint {
         let anchor = clusterAnchors[kind] ?? .center
-        return CGPoint(x: size.width * anchor.x, y: size.height * anchor.y)
+        let constellationFrame = constellationFrame(in: size)
+        return CGPoint(
+            x: constellationFrame.minX + constellationFrame.width * anchor.x,
+            y: constellationFrame.minY + constellationFrame.height * anchor.y
+        )
+    }
+
+    private func constellationFrame(in size: CGSize) -> CGRect {
+        let leadingInset = min(max(size.width * 0.28, 220), 300)
+        let trailingInset = max(56, size.width * 0.08)
+        let topInset: CGFloat = 44
+        let bottomInset: CGFloat = 54
+
+        return CGRect(
+            x: leadingInset,
+            y: topInset,
+            width: max(size.width - leadingInset - trailingInset, 220),
+            height: max(size.height - topInset - bottomInset, 220)
+        )
     }
 
     private func starPosition(index: Int, around center: CGPoint, radius: CGFloat) -> CGPoint {
