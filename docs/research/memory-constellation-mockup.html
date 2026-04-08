@@ -64,9 +64,7 @@
     margin: 0 auto;
   }
 
-  section {
-    margin-bottom: 140px;
-  }
+  section { margin-bottom: 140px; }
 
   section .section-eyebrow {
     font-size: 10px;
@@ -90,46 +88,104 @@
     margin: 0 0 60px;
   }
 
-  /* Floating bar grid */
-  .bar-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 80px;
-    align-items: center;
-  }
-
-  .bar-state {
+  /* ============ FLOATING BAR STAGE ============ */
+  .bar-stage {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 24px;
+    gap: 32px;
   }
 
-  .bar-state .state-label {
-    font-size: 10px;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    color: var(--ink-faint);
+  .bar-display {
+    position: relative;
+    width: 380px;
+    height: 100px;
   }
 
-  .bar-state .state-caption {
-    font-size: 14px;
+  .bar-display svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .bar-display .state {
+    opacity: 0;
+    transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .bar-display[data-state="idle"] .state-idle { opacity: 1; }
+  .bar-display[data-state="listening"] .state-listening { opacity: 1; }
+  .bar-display[data-state="recognized"] .state-recognized { opacity: 1; }
+
+  /* per-star fade for listening play */
+  .word-star { opacity: 0; transition: opacity 0.5s ease-out; }
+  .bar-display[data-state="listening"] .word-star,
+  .bar-display[data-state="recognized"] .word-star { opacity: var(--target-opacity, 0.9); }
+
+  .bar-display .gold-glow,
+  .bar-display .gold-line,
+  .bar-display .gold-core { opacity: 0; transition: opacity 0.6s ease-out; }
+  .bar-display[data-state="recognized"] .gold-glow { opacity: 1; }
+  .bar-display[data-state="recognized"] .gold-line { opacity: 0.85; }
+  .bar-display[data-state="recognized"] .gold-core { opacity: 1; }
+
+  .bar-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pill-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12);
     color: var(--ink-dim);
-    max-width: 380px;
-    text-align: center;
-    margin: 0;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 9px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 300;
+    transition: all 0.2s ease;
   }
-
-  .bar-state.highlight .state-label {
+  .pill-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: var(--ink);
+    border-color: rgba(255,255,255,0.2);
+  }
+  .pill-btn.active {
+    background: rgba(212,175,122,0.12);
+    border-color: var(--gold);
     color: var(--gold);
   }
+  .pill-btn.play {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #1A0E00;
+    font-weight: 500;
+  }
+  .pill-btn.play:hover {
+    background: #E5C089;
+  }
 
-  .bar-state.highlight .state-caption strong {
+  .bar-caption {
+    font-size: 14px;
+    color: var(--ink-dim);
+    max-width: 420px;
+    text-align: center;
+    margin: 0;
+    min-height: 44px;
+    transition: color 0.4s ease;
+  }
+  .bar-display[data-state="recognized"] ~ .bar-caption strong {
     color: var(--gold);
     font-weight: 400;
   }
 
-  /* Universe frame */
+  /* ============ UNIVERSE FRAME ============ */
   .universe-frame {
     background: var(--bg-soft);
     border: 1px solid rgba(255,255,255,0.06);
@@ -164,9 +220,15 @@
     text-transform: uppercase;
     color: var(--ink-dim);
     padding: 9px 16px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: 999px;
+    cursor: pointer;
+    background: transparent;
+    font-family: inherit;
+    font-weight: 300;
+    transition: all 0.3s ease;
   }
+  .privacy-toggle:hover { background: rgba(255,255,255,0.04); }
 
   .privacy-toggle .dot {
     display: inline-block;
@@ -177,13 +239,59 @@
     margin-right: 8px;
     vertical-align: middle;
     box-shadow: 0 0 10px var(--gold);
+    transition: all 0.3s ease;
+  }
+  .privacy-mode .privacy-toggle .dot {
+    background: transparent;
+    border: 1px solid rgba(245,241,232,0.4);
+    box-shadow: none;
+  }
+  .privacy-mode .privacy-toggle { color: rgba(245,241,232,0.4); }
+
+  .canvas-wrap { position: relative; }
+  .canvas-wrap svg { display: block; width: 100%; height: auto; }
+
+  /* privacy mode dimming */
+  .universe-canvas .field-star,
+  .universe-canvas .const-line,
+  .universe-canvas .bright-star { transition: opacity 0.6s ease, fill 0.6s ease; }
+
+  .privacy-mode .universe-canvas .field-star { opacity: 0.1 !important; }
+  .privacy-mode .universe-canvas .const-line { opacity: 0.08 !important; }
+  .privacy-mode .universe-canvas .bright-star { opacity: 0.18 !important; }
+  .privacy-mode .universe-canvas .gold-anchor,
+  .privacy-mode .universe-canvas .gold-thread { opacity: 0 !important; }
+  .privacy-mode .universe-canvas .ghost-only { opacity: 1 !important; }
+
+  .ghost-only { opacity: 0; transition: opacity 0.6s ease; }
+
+  /* tooltip */
+  .star-tip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(10,14,31,0.95);
+    border: 1px solid rgba(212,175,122,0.4);
+    color: var(--ink);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 6px 11px;
+    border-radius: 6px;
+    transform: translate(-50%, -130%);
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .star-tip.show { opacity: 1; }
+  .star-tip .meta {
+    display: block;
+    color: var(--ink-faint);
+    font-size: 9px;
+    margin-top: 2px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
 
-  .canvas-wrap svg {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
+  .universe-canvas circle.bright-star { cursor: pointer; }
 
   .universe-footer {
     padding: 28px 40px 36px;
@@ -200,25 +308,14 @@
     margin-bottom: 28px;
     flex-wrap: wrap;
   }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-  }
-
-  .legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
+  .legend-item { display: flex; align-items: center; gap: 9px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 
   .time-slider {
     display: flex;
     align-items: center;
     gap: 18px;
   }
-
   .time-slider .ends {
     font-size: 10px;
     letter-spacing: 0.15em;
@@ -227,73 +324,39 @@
     white-space: nowrap;
   }
 
-  .slider-track {
+  .slider-wrap {
     flex: 1;
+    position: relative;
+    height: 24px;
+    display: flex;
+    align-items: center;
+  }
+  .slider-track {
+    width: 100%;
     height: 1px;
     background: rgba(255,255,255,0.1);
     position: relative;
   }
-
+  .slider-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    background: var(--gold-soft);
+    width: 100%;
+  }
   .slider-handle {
     position: absolute;
-    right: 0;
     top: 50%;
-    transform: translate(50%, -50%);
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: var(--gold);
     box-shadow: 0 0 14px var(--gold-soft);
+    transform: translate(-50%, -50%);
+    cursor: grab;
+    transition: transform 0.15s ease;
   }
-
-  /* Privacy comparison */
-  .privacy-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
-  }
-
-  .privacy-card {
-    background: var(--bg-soft);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
-  .privacy-card .head {
-    padding: 22px 26px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .privacy-card .head .label {
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--ink-dim);
-  }
-
-  .privacy-card .head .indicator { font-size: 14px; }
-  .privacy-card .head .indicator.on { color: var(--gold); }
-  .privacy-card .head .indicator.off { color: rgba(245,241,232,0.35); }
-
-  .privacy-card .body {
-    padding: 24px;
-  }
-
-  .privacy-card .body svg {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .privacy-card .desc {
-    font-size: 12px;
-    color: var(--ink-dim);
-    margin: 18px 4px 0;
-  }
+  .slider-handle:hover { transform: translate(-50%, -50%) scale(1.15); }
+  .slider-handle:active { cursor: grabbing; }
 
   footer.foot {
     text-align: center;
@@ -314,120 +377,108 @@
     <p class="tagline">Voice in. Thought out. Every word you speak quietly lights a star in a sky that belongs only to you.</p>
   </header>
 
-  <!-- ============ PART ONE: FLOATING BAR ============ -->
+  <!-- ============ PART ONE ============ -->
   <section>
     <div class="section-eyebrow">Part One</div>
     <h2>The Floating Bar</h2>
-    <p class="lede">A small capsule near the bottom of the screen. The user's only constant companion. Three states, one rule: stay quiet until there's something worth seeing.</p>
+    <p class="lede">A small capsule near the bottom of the screen. The user's only constant companion. Three states, one rule: stay quiet until there's something worth seeing. <strong style="color:var(--ink)">Click a state — or press Play.</strong></p>
 
-    <div class="bar-grid">
-      <!-- IDLE -->
-      <div class="bar-state">
-        <div class="state-label">01 · Idle</div>
-        <svg width="380" height="80" viewBox="0 0 380 80">
+    <div class="bar-stage">
+      <div class="bar-display" id="barDisplay" data-state="idle">
+        <svg viewBox="0 0 380 100">
           <defs>
             <radialGradient id="breath" cx="50%" cy="50%">
               <stop offset="0%" stop-color="#F5F1E8" stop-opacity="0.6"/>
               <stop offset="100%" stop-color="#F5F1E8" stop-opacity="0"/>
             </radialGradient>
-          </defs>
-          <rect x="30" y="20" width="320" height="40" rx="20"
-                fill="#0A0E27" stroke="#1A2040" stroke-width="1"/>
-          <circle cx="190" cy="40" r="16" fill="url(#breath)"/>
-          <circle cx="190" cy="40" r="2" fill="#F5F1E8" opacity="0.85"/>
-        </svg>
-        <p class="state-caption">Resting. A single breath of light. The user forgets it's there.</p>
-      </div>
-
-      <!-- LISTENING -->
-      <div class="bar-state">
-        <div class="state-label">02 · Listening</div>
-        <svg width="380" height="100" viewBox="0 0 380 100">
-          <defs>
-            <clipPath id="cap-listen">
-              <rect x="30" y="20" width="320" height="60" rx="30"/>
-            </clipPath>
-          </defs>
-          <rect x="30" y="20" width="320" height="60" rx="30"
-                fill="#0A0E27" stroke="#1A2040" stroke-width="1"/>
-          <g clip-path="url(#cap-listen)">
-            <ellipse cx="190" cy="50" rx="160" ry="30" fill="#0F1535" opacity="0.7"/>
-            <!-- background dust -->
-            <circle cx="70" cy="38" r="0.7" fill="#F5F1E8" opacity="0.3"/>
-            <circle cx="95" cy="60" r="0.6" fill="#F5F1E8" opacity="0.25"/>
-            <circle cx="130" cy="35" r="0.8" fill="#F5F1E8" opacity="0.35"/>
-            <circle cx="265" cy="62" r="0.7" fill="#F5F1E8" opacity="0.3"/>
-            <circle cx="305" cy="35" r="0.6" fill="#F5F1E8" opacity="0.28"/>
-            <!-- foreground stars (current words) -->
-            <circle cx="105" cy="48" r="1.4" fill="#F5F1E8" opacity="0.7"/>
-            <circle cx="140" cy="55" r="1.6" fill="#F5F1E8" opacity="0.85"/>
-            <circle cx="170" cy="42" r="1.8" fill="#F5F1E8"/>
-            <circle cx="195" cy="52" r="2" fill="#F5F1E8"/>
-            <circle cx="225" cy="44" r="1.7" fill="#F5F1E8" opacity="0.95"/>
-            <circle cx="255" cy="50" r="1.5" fill="#F5F1E8" opacity="0.8"/>
-            <circle cx="285" cy="55" r="1.3" fill="#F5F1E8" opacity="0.65"/>
-          </g>
-        </svg>
-        <p class="state-caption">Speaking. Each word lights as a new star, inside a small window of sky.</p>
-      </div>
-
-      <!-- RECOGNIZED -->
-      <div class="bar-state highlight">
-        <div class="state-label">03 · Recognized</div>
-        <svg width="380" height="100" viewBox="0 0 380 100">
-          <defs>
-            <clipPath id="cap-hit">
-              <rect x="30" y="20" width="320" height="60" rx="30"/>
-            </clipPath>
             <radialGradient id="goldglow" cx="50%" cy="50%">
               <stop offset="0%" stop-color="#D4AF7A" stop-opacity="1"/>
               <stop offset="40%" stop-color="#D4AF7A" stop-opacity="0.4"/>
               <stop offset="100%" stop-color="#D4AF7A" stop-opacity="0"/>
             </radialGradient>
+            <clipPath id="cap-listen-i">
+              <rect x="30" y="20" width="320" height="60" rx="30"/>
+            </clipPath>
           </defs>
-          <rect x="30" y="20" width="320" height="60" rx="30"
-                fill="#0A0E27" stroke="#2A2540" stroke-width="1"/>
-          <g clip-path="url(#cap-hit)">
-            <ellipse cx="190" cy="50" rx="160" ry="30" fill="#0F1535" opacity="0.7"/>
-            <!-- existing dim stars -->
-            <circle cx="105" cy="48" r="1.4" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="140" cy="55" r="1.6" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="255" cy="50" r="1.5" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="285" cy="55" r="1.3" fill="#F5F1E8" opacity="0.4"/>
-            <!-- gold connection -->
-            <line x1="170" y1="42" x2="225" y2="44"
-                  stroke="#D4AF7A" stroke-width="0.8" opacity="0.85"/>
-            <!-- the two highlighted stars with halos -->
-            <circle cx="170" cy="42" r="9" fill="url(#goldglow)"/>
-            <circle cx="170" cy="42" r="2.2" fill="#D4AF7A"/>
-            <circle cx="225" cy="44" r="9" fill="url(#goldglow)"/>
-            <circle cx="225" cy="44" r="2.2" fill="#D4AF7A"/>
+
+          <!-- IDLE -->
+          <g class="state state-idle">
+            <rect x="30" y="30" width="320" height="40" rx="20"
+                  fill="#0A0E27" stroke="#1A2040" stroke-width="1"/>
+            <circle cx="190" cy="50" r="16" fill="url(#breath)"/>
+            <circle cx="190" cy="50" r="2" fill="#F5F1E8" opacity="0.85"/>
+          </g>
+
+          <!-- LISTENING -->
+          <g class="state state-listening">
+            <rect x="30" y="20" width="320" height="60" rx="30"
+                  fill="#0A0E27" stroke="#1A2040" stroke-width="1"/>
+            <g clip-path="url(#cap-listen-i)">
+              <ellipse cx="190" cy="50" rx="160" ry="30" fill="#0F1535" opacity="0.7"/>
+              <circle cx="70" cy="38" r="0.7" fill="#F5F1E8" opacity="0.3"/>
+              <circle cx="95" cy="60" r="0.6" fill="#F5F1E8" opacity="0.25"/>
+              <circle cx="305" cy="35" r="0.6" fill="#F5F1E8" opacity="0.28"/>
+              <circle class="word-star" style="--target-opacity:0.7"  cx="105" cy="48" r="1.4" fill="#F5F1E8"/>
+              <circle class="word-star" style="--target-opacity:0.85" cx="140" cy="55" r="1.6" fill="#F5F1E8"/>
+              <circle class="word-star" style="--target-opacity:1"    cx="170" cy="42" r="1.8" fill="#F5F1E8"/>
+              <circle class="word-star" style="--target-opacity:1"    cx="195" cy="52" r="2"   fill="#F5F1E8"/>
+              <circle class="word-star" style="--target-opacity:0.95" cx="225" cy="44" r="1.7" fill="#F5F1E8"/>
+              <circle class="word-star" style="--target-opacity:0.8"  cx="255" cy="50" r="1.5" fill="#F5F1E8"/>
+              <circle class="word-star" style="--target-opacity:0.65" cx="285" cy="55" r="1.3" fill="#F5F1E8"/>
+            </g>
+          </g>
+
+          <!-- RECOGNIZED -->
+          <g class="state state-recognized">
+            <rect x="30" y="20" width="320" height="60" rx="30"
+                  fill="#0A0E27" stroke="#2A2540" stroke-width="1"/>
+            <g clip-path="url(#cap-listen-i)">
+              <ellipse cx="190" cy="50" rx="160" ry="30" fill="#0F1535" opacity="0.7"/>
+              <circle cx="105" cy="48" r="1.4" fill="#F5F1E8" opacity="0.4"/>
+              <circle cx="140" cy="55" r="1.6" fill="#F5F1E8" opacity="0.5"/>
+              <circle cx="255" cy="50" r="1.5" fill="#F5F1E8" opacity="0.5"/>
+              <circle cx="285" cy="55" r="1.3" fill="#F5F1E8" opacity="0.4"/>
+              <line class="gold-line" x1="170" y1="42" x2="225" y2="44"
+                    stroke="#D4AF7A" stroke-width="0.8"/>
+              <circle class="gold-glow" cx="170" cy="42" r="9" fill="url(#goldglow)"/>
+              <circle class="gold-core" cx="170" cy="42" r="2.2" fill="#D4AF7A"/>
+              <circle class="gold-glow" cx="225" cy="44" r="9" fill="url(#goldglow)"/>
+              <circle class="gold-core" cx="225" cy="44" r="2.2" fill="#D4AF7A"/>
+            </g>
           </g>
         </svg>
-        <p class="state-caption"><strong>It remembered.</strong> A new word and one it has known for weeks meet in a single line of gold.</p>
       </div>
+
+      <div class="bar-controls">
+        <button class="pill-btn state-btn active" data-target="idle">Idle</button>
+        <button class="pill-btn state-btn" data-target="listening">Listening</button>
+        <button class="pill-btn state-btn" data-target="recognized">Recognized</button>
+        <button class="pill-btn play" id="playBtn">▶ Play sequence</button>
+      </div>
+
+      <p class="bar-caption" id="barCaption">Resting. A single breath of light. The user forgets it's there.</p>
     </div>
   </section>
 
-  <!-- ============ PART TWO: MY UNIVERSE ============ -->
+  <!-- ============ PART TWO ============ -->
   <section>
     <div class="section-eyebrow">Part Two</div>
     <h2>My Universe</h2>
-    <p class="lede">When the user opens their memory, the constellation unfolds. Every star is a thing it has learned. Every cluster is a kind of knowing — words you use, ways you write, places you write them.</p>
+    <p class="lede">When the user opens their memory, the constellation unfolds. Every star is a thing it has learned. <strong style="color:var(--ink)">Hover a bright star. Toggle privacy. Drag the time slider.</strong></p>
 
-    <div class="universe-frame">
+    <div class="universe-frame" id="universeFrame">
       <div class="universe-header">
         <div>
           <div class="title">90 days of you</div>
-          <div class="meta">247 words remembered · 12 style habits · 5 scenes</div>
+          <div class="meta" id="universeMeta">247 words remembered · 12 style habits · 5 scenes</div>
         </div>
-        <div class="privacy-toggle">
-          <span class="dot"></span>Memory On
-        </div>
+        <button class="privacy-toggle" id="privacyToggle">
+          <span class="dot"></span><span id="privacyLabel">Memory On</span>
+        </button>
       </div>
 
       <div class="canvas-wrap">
-        <svg viewBox="0 0 900 540" preserveAspectRatio="xMidYMid meet">
+        <svg class="universe-canvas" viewBox="0 0 900 540" preserveAspectRatio="xMidYMid meet">
           <defs>
             <radialGradient id="vocab-glow" cx="50%" cy="50%">
               <stop offset="0%" stop-color="#9DB4D6" stop-opacity="0.15"/>
@@ -448,133 +499,131 @@
             </radialGradient>
           </defs>
 
-          <!-- background nebulae -->
           <ellipse cx="260" cy="210" rx="220" ry="160" fill="url(#vocab-glow)"/>
           <ellipse cx="690" cy="190" rx="170" ry="125" fill="url(#style-glow)"/>
           <ellipse cx="470" cy="410" rx="210" ry="115" fill="url(#scene-glow)"/>
 
-          <!-- ============ VOCABULARY (top-left) ============ -->
+          <!-- VOCAB -->
           <g id="vocab">
-            <line x1="180" y1="150" x2="240" y2="180" stroke="#9DB4D6" stroke-width="0.4" opacity="0.4"/>
-            <line x1="240" y1="180" x2="290" y2="160" stroke="#9DB4D6" stroke-width="0.4" opacity="0.4"/>
-            <line x1="290" y1="160" x2="340" y2="200" stroke="#9DB4D6" stroke-width="0.4" opacity="0.4"/>
-            <line x1="240" y1="180" x2="220" y2="240" stroke="#9DB4D6" stroke-width="0.4" opacity="0.35"/>
-            <line x1="220" y1="240" x2="280" y2="270" stroke="#9DB4D6" stroke-width="0.4" opacity="0.35"/>
-            <line x1="180" y1="150" x2="160" y2="220" stroke="#9DB4D6" stroke-width="0.4" opacity="0.3"/>
-            <line x1="160" y1="220" x2="120" y2="260" stroke="#9DB4D6" stroke-width="0.4" opacity="0.3"/>
-            <line x1="340" y1="200" x2="380" y2="250" stroke="#9DB4D6" stroke-width="0.4" opacity="0.3"/>
+            <line class="const-line" x1="180" y1="150" x2="240" y2="180" stroke="#9DB4D6" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="240" y1="180" x2="290" y2="160" stroke="#9DB4D6" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="290" y1="160" x2="340" y2="200" stroke="#9DB4D6" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="240" y1="180" x2="220" y2="240" stroke="#9DB4D6" stroke-width="0.4" opacity="0.35"/>
+            <line class="const-line" x1="220" y1="240" x2="280" y2="270" stroke="#9DB4D6" stroke-width="0.4" opacity="0.35"/>
+            <line class="const-line" x1="180" y1="150" x2="160" y2="220" stroke="#9DB4D6" stroke-width="0.4" opacity="0.3"/>
+            <line class="const-line" x1="160" y1="220" x2="120" y2="260" stroke="#9DB4D6" stroke-width="0.4" opacity="0.3"/>
+            <line class="const-line" x1="340" y1="200" x2="380" y2="250" stroke="#9DB4D6" stroke-width="0.4" opacity="0.3"/>
 
-            <circle cx="180" cy="150" r="2.4" fill="#F5F1E8"/>
-            <circle cx="290" cy="160" r="2.6" fill="#F5F1E8"/>
-            <circle cx="340" cy="200" r="2.2" fill="#F5F1E8" opacity="0.95"/>
-            <circle cx="220" cy="240" r="2.4" fill="#F5F1E8" opacity="0.9"/>
-            <circle cx="280" cy="270" r="2" fill="#F5F1E8" opacity="0.85"/>
-            <circle cx="160" cy="220" r="2.2" fill="#F5F1E8" opacity="0.9"/>
-            <circle cx="120" cy="260" r="1.8" fill="#F5F1E8" opacity="0.75"/>
-            <circle cx="380" cy="250" r="1.8" fill="#F5F1E8" opacity="0.7"/>
+            <circle class="bright-star" data-word="superInput"   data-meta="VOCABULARY · 47 uses"    cx="180" cy="150" r="2.4" fill="#F5F1E8"/>
+            <circle class="bright-star" data-word="MemoryCore"   data-meta="VOCABULARY · 38 uses"    cx="290" cy="160" r="2.6" fill="#F5F1E8"/>
+            <circle class="bright-star" data-word="SwiftUI"      data-meta="VOCABULARY · 24 uses"    cx="340" cy="200" r="2.2" fill="#F5F1E8" opacity="0.95"/>
+            <circle class="bright-star" data-word="hackathon"    data-meta="VOCABULARY · 19 uses"    cx="220" cy="240" r="2.4" fill="#F5F1E8" opacity="0.9"/>
+            <circle class="bright-star" data-word="constellation" data-meta="VOCABULARY · 16 uses"   cx="280" cy="270" r="2"   fill="#F5F1E8" opacity="0.85"/>
+            <circle class="bright-star" data-word="overlay"      data-meta="VOCABULARY · 14 uses"    cx="160" cy="220" r="2.2" fill="#F5F1E8" opacity="0.9"/>
+            <circle class="bright-star" data-word="recall"       data-meta="VOCABULARY · 11 uses"    cx="120" cy="260" r="1.8" fill="#F5F1E8" opacity="0.75"/>
+            <circle class="bright-star" data-word="ingest"       data-meta="VOCABULARY · 9 uses"     cx="380" cy="250" r="1.8" fill="#F5F1E8" opacity="0.7"/>
 
-            <!-- field stars -->
-            <circle cx="200" cy="100" r="1.2" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="260" cy="120" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="320" cy="115" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="370" cy="155" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="155" cy="180" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="100" cy="200" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="200" cy="280" r="1.2" fill="#F5F1E8" opacity="0.55"/>
-            <circle cx="260" cy="310" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="340" cy="290" r="1.2" fill="#F5F1E8" opacity="0.55"/>
-            <circle cx="400" cy="290" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="135" cy="305" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="180" cy="320" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="305" cy="225" r="0.9" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="200" cy="200" r="0.9" fill="#F5F1E8" opacity="0.4"/>
+            <circle class="field-star" cx="200" cy="100" r="1.2" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="260" cy="120" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="320" cy="115" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="370" cy="155" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="155" cy="180" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="100" cy="200" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="200" cy="280" r="1.2" fill="#F5F1E8" opacity="0.55"/>
+            <circle class="field-star" cx="260" cy="310" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="340" cy="290" r="1.2" fill="#F5F1E8" opacity="0.55"/>
+            <circle class="field-star" cx="400" cy="290" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="135" cy="305" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="180" cy="320" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="305" cy="225" r="0.9" fill="#F5F1E8" opacity="0.4"/>
+            <circle class="field-star" cx="200" cy="200" r="0.9" fill="#F5F1E8" opacity="0.4"/>
 
-            <!-- recently activated (gold) - the anchor star -->
-            <circle cx="240" cy="180" r="16" fill="url(#big-gold-glow)"/>
-            <circle cx="240" cy="180" r="3.2" fill="#D4AF7A"/>
+            <!-- gold anchor: today's word -->
+            <circle class="gold-anchor" cx="240" cy="180" r="16" fill="url(#big-gold-glow)"/>
+            <circle class="bright-star gold-anchor" data-word="constellation" data-meta="VOCABULARY · activated today" cx="240" cy="180" r="3.2" fill="#D4AF7A"/>
 
             <text x="180" y="80" font-family="Inter, system-ui" font-size="10" font-weight="300"
                   fill="#9DB4D6" letter-spacing="2" opacity="0.7">VOCABULARY · 247</text>
           </g>
 
-          <!-- ============ STYLE (top-right) ============ -->
+          <!-- STYLE -->
           <g id="style">
-            <line x1="640" y1="150" x2="700" y2="180" stroke="#D6A89D" stroke-width="0.4" opacity="0.4"/>
-            <line x1="700" y1="180" x2="760" y2="160" stroke="#D6A89D" stroke-width="0.4" opacity="0.4"/>
-            <line x1="700" y1="180" x2="690" y2="240" stroke="#D6A89D" stroke-width="0.4" opacity="0.35"/>
-            <line x1="690" y1="240" x2="750" y2="250" stroke="#D6A89D" stroke-width="0.4" opacity="0.35"/>
-            <line x1="640" y1="150" x2="610" y2="210" stroke="#D6A89D" stroke-width="0.4" opacity="0.3"/>
+            <line class="const-line" x1="640" y1="150" x2="700" y2="180" stroke="#D6A89D" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="700" y1="180" x2="760" y2="160" stroke="#D6A89D" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="700" y1="180" x2="690" y2="240" stroke="#D6A89D" stroke-width="0.4" opacity="0.35"/>
+            <line class="const-line" x1="690" y1="240" x2="750" y2="250" stroke="#D6A89D" stroke-width="0.4" opacity="0.35"/>
+            <line class="const-line" x1="640" y1="150" x2="610" y2="210" stroke="#D6A89D" stroke-width="0.4" opacity="0.3"/>
 
-            <circle cx="640" cy="150" r="2.4" fill="#F5F1E8"/>
-            <circle cx="700" cy="180" r="2.6" fill="#F5F1E8"/>
-            <circle cx="760" cy="160" r="2.2" fill="#F5F1E8" opacity="0.95"/>
-            <circle cx="690" cy="240" r="2.4" fill="#F5F1E8" opacity="0.9"/>
-            <circle cx="750" cy="250" r="2" fill="#F5F1E8" opacity="0.85"/>
-            <circle cx="610" cy="210" r="2" fill="#F5F1E8" opacity="0.85"/>
+            <circle class="bright-star" data-word="short sentences"  data-meta="STYLE · habit"            cx="640" cy="150" r="2.4" fill="#F5F1E8"/>
+            <circle class="bright-star" data-word="em-dash lover"    data-meta="STYLE · habit"            cx="700" cy="180" r="2.6" fill="#F5F1E8"/>
+            <circle class="bright-star" data-word="no exclamations"  data-meta="STYLE · habit"            cx="760" cy="160" r="2.2" fill="#F5F1E8" opacity="0.95"/>
+            <circle class="bright-star" data-word="lowercase Slack"  data-meta="STYLE · habit"            cx="690" cy="240" r="2.4" fill="#F5F1E8" opacity="0.9"/>
+            <circle class="bright-star" data-word="formal email"     data-meta="STYLE · habit"            cx="750" cy="250" r="2"   fill="#F5F1E8" opacity="0.85"/>
+            <circle class="bright-star" data-word="dry humor"        data-meta="STYLE · habit"            cx="610" cy="210" r="2"   fill="#F5F1E8" opacity="0.85"/>
 
-            <circle cx="660" cy="110" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="720" cy="120" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="780" cy="200" r="1.2" fill="#F5F1E8" opacity="0.55"/>
-            <circle cx="630" cy="265" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="720" cy="285" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="800" cy="240" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="595" cy="160" r="0.9" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="675" cy="295" r="0.9" fill="#F5F1E8" opacity="0.4"/>
+            <circle class="field-star" cx="660" cy="110" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="720" cy="120" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="780" cy="200" r="1.2" fill="#F5F1E8" opacity="0.55"/>
+            <circle class="field-star" cx="630" cy="265" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="720" cy="285" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="800" cy="240" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="595" cy="160" r="0.9" fill="#F5F1E8" opacity="0.4"/>
+            <circle class="field-star" cx="675" cy="295" r="0.9" fill="#F5F1E8" opacity="0.4"/>
 
             <text x="610" y="80" font-family="Inter, system-ui" font-size="10" font-weight="300"
                   fill="#D6A89D" letter-spacing="2" opacity="0.7">STYLE · 12</text>
           </g>
 
-          <!-- ============ SCENES (bottom-center) ============ -->
+          <!-- SCENES -->
           <g id="scene">
-            <line x1="400" y1="400" x2="460" y2="380" stroke="#A8D6B5" stroke-width="0.4" opacity="0.4"/>
-            <line x1="460" y1="380" x2="520" y2="410" stroke="#A8D6B5" stroke-width="0.4" opacity="0.4"/>
-            <line x1="460" y1="380" x2="490" y2="440" stroke="#A8D6B5" stroke-width="0.4" opacity="0.35"/>
-            <line x1="400" y1="400" x2="380" y2="450" stroke="#A8D6B5" stroke-width="0.4" opacity="0.35"/>
+            <line class="const-line" x1="400" y1="400" x2="460" y2="380" stroke="#A8D6B5" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="460" y1="380" x2="520" y2="410" stroke="#A8D6B5" stroke-width="0.4" opacity="0.4"/>
+            <line class="const-line" x1="460" y1="380" x2="490" y2="440" stroke="#A8D6B5" stroke-width="0.4" opacity="0.35"/>
+            <line class="const-line" x1="400" y1="400" x2="380" y2="450" stroke="#A8D6B5" stroke-width="0.4" opacity="0.35"/>
 
-            <circle cx="400" cy="400" r="2.4" fill="#F5F1E8" opacity="0.95"/>
-            <circle cx="520" cy="410" r="2.2" fill="#F5F1E8" opacity="0.9"/>
-            <circle cx="490" cy="440" r="2" fill="#F5F1E8" opacity="0.85"/>
-            <circle cx="380" cy="450" r="1.8" fill="#F5F1E8" opacity="0.8"/>
+            <circle class="bright-star" data-word="Slack"   data-meta="SCENE · 102 uses"   cx="400" cy="400" r="2.4" fill="#F5F1E8" opacity="0.95"/>
+            <circle class="bright-star" data-word="Mail"    data-meta="SCENE · 78 uses"    cx="520" cy="410" r="2.2" fill="#F5F1E8" opacity="0.9"/>
+            <circle class="bright-star" data-word="Notes"   data-meta="SCENE · 51 uses"    cx="490" cy="440" r="2"   fill="#F5F1E8" opacity="0.85"/>
+            <circle class="bright-star ghost-only" data-word="1Password" data-meta="SCENE · live, never written" cx="380" cy="450" r="2.2" fill="none" stroke="#F5F1E8" stroke-width="0.7"/>
 
-            <circle cx="430" cy="350" r="1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="555" cy="385" r="1.1" fill="#F5F1E8" opacity="0.5"/>
-            <circle cx="430" cy="475" r="1" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="520" cy="465" r="0.9" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="350" cy="410" r="0.9" fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="430" cy="350" r="1"   fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="555" cy="385" r="1.1" fill="#F5F1E8" opacity="0.5"/>
+            <circle class="field-star" cx="430" cy="475" r="1"   fill="#F5F1E8" opacity="0.45"/>
+            <circle class="field-star" cx="520" cy="465" r="0.9" fill="#F5F1E8" opacity="0.4"/>
+            <circle class="field-star" cx="350" cy="410" r="0.9" fill="#F5F1E8" opacity="0.45"/>
 
-            <!-- second gold anchor -->
-            <circle cx="460" cy="380" r="14" fill="url(#big-gold-glow)"/>
-            <circle cx="460" cy="380" r="2.8" fill="#D4AF7A"/>
+            <circle class="gold-anchor" cx="460" cy="380" r="14" fill="url(#big-gold-glow)"/>
+            <circle class="bright-star gold-anchor" data-word="Code editor" data-meta="SCENE · activated today" cx="460" cy="380" r="2.8" fill="#D4AF7A"/>
 
             <text x="380" y="500" font-family="Inter, system-ui" font-size="10" font-weight="300"
                   fill="#A8D6B5" letter-spacing="2" opacity="0.7">SCENES · 5</text>
           </g>
 
-          <!-- field background dust -->
+          <!-- field dust -->
           <g opacity="0.4">
-            <circle cx="50" cy="50" r="0.6" fill="#F5F1E8"/>
-            <circle cx="850" cy="60" r="0.7" fill="#F5F1E8"/>
-            <circle cx="500" cy="50" r="0.5" fill="#F5F1E8"/>
-            <circle cx="60" cy="450" r="0.6" fill="#F5F1E8"/>
-            <circle cx="850" cy="470" r="0.6" fill="#F5F1E8"/>
-            <circle cx="780" cy="380" r="0.5" fill="#F5F1E8"/>
-            <circle cx="60" cy="360" r="0.5" fill="#F5F1E8"/>
-            <circle cx="445" cy="100" r="0.5" fill="#F5F1E8"/>
-            <circle cx="500" cy="200" r="0.6" fill="#F5F1E8"/>
-            <circle cx="550" cy="280" r="0.6" fill="#F5F1E8"/>
-            <circle cx="430" cy="260" r="0.5" fill="#F5F1E8"/>
-            <circle cx="40" cy="160" r="0.5" fill="#F5F1E8"/>
-            <circle cx="870" cy="320" r="0.5" fill="#F5F1E8"/>
-            <circle cx="780" cy="100" r="0.5" fill="#F5F1E8"/>
-            <circle cx="200" cy="500" r="0.5" fill="#F5F1E8"/>
-            <circle cx="650" cy="480" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="50" cy="50" r="0.6" fill="#F5F1E8"/>
+            <circle class="field-star" cx="850" cy="60" r="0.7" fill="#F5F1E8"/>
+            <circle class="field-star" cx="500" cy="50" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="60" cy="450" r="0.6" fill="#F5F1E8"/>
+            <circle class="field-star" cx="850" cy="470" r="0.6" fill="#F5F1E8"/>
+            <circle class="field-star" cx="780" cy="380" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="60" cy="360" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="445" cy="100" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="500" cy="200" r="0.6" fill="#F5F1E8"/>
+            <circle class="field-star" cx="550" cy="280" r="0.6" fill="#F5F1E8"/>
+            <circle class="field-star" cx="430" cy="260" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="40" cy="160" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="870" cy="320" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="780" cy="100" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="200" cy="500" r="0.5" fill="#F5F1E8"/>
+            <circle class="field-star" cx="650" cy="480" r="0.5" fill="#F5F1E8"/>
           </g>
 
-          <!-- the cross-cluster gold thread: today's recognition -->
-          <line x1="240" y1="180" x2="460" y2="380"
+          <line class="gold-thread" x1="240" y1="180" x2="460" y2="380"
                 stroke="#D4AF7A" stroke-width="0.6" opacity="0.5" stroke-dasharray="3,4"/>
         </svg>
+
+        <div class="star-tip" id="starTip"><span id="tipWord"></span><span class="meta" id="tipMeta"></span></div>
       </div>
 
       <div class="universe-footer">
@@ -585,102 +634,152 @@
           <div class="legend-item"><span class="legend-dot" style="background:#D4AF7A; box-shadow:0 0 8px #D4AF7A"></span>Active today</div>
         </div>
         <div class="time-slider">
-          <span class="ends">90 days ago</span>
-          <div class="slider-track">
-            <div class="slider-handle"></div>
+          <span class="ends" id="dayLabelLeft">90 days ago</span>
+          <div class="slider-wrap">
+            <div class="slider-track">
+              <div class="slider-fill" id="sliderFill"></div>
+              <div class="slider-handle" id="sliderHandle" style="left:100%"></div>
+            </div>
           </div>
-          <span class="ends">Today</span>
+          <span class="ends" id="dayLabelRight">Today</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ============ PART THREE: PRIVACY ============ -->
-  <section>
-    <div class="section-eyebrow">Part Three</div>
-    <h2>Privacy, Visible</h2>
-    <p class="lede">In sensitive scenes — passwords, private chats, anything you mark — the constellation goes ghost. Used in the moment, never written into the sky.</p>
-
-    <div class="privacy-grid">
-
-      <div class="privacy-card">
-        <div class="head">
-          <span class="label">Memory On</span>
-          <span class="indicator on">●</span>
-        </div>
-        <div class="body">
-          <svg viewBox="0 0 400 240">
-            <line x1="80" y1="80" x2="130" y2="105" stroke="#F5F1E8" stroke-width="0.4" opacity="0.3"/>
-            <line x1="130" y1="105" x2="180" y2="85" stroke="#F5F1E8" stroke-width="0.4" opacity="0.3"/>
-            <line x1="130" y1="105" x2="120" y2="160" stroke="#F5F1E8" stroke-width="0.4" opacity="0.3"/>
-            <line x1="220" y1="130" x2="280" y2="120" stroke="#F5F1E8" stroke-width="0.4" opacity="0.3"/>
-            <line x1="280" y1="120" x2="320" y2="170" stroke="#F5F1E8" stroke-width="0.4" opacity="0.3"/>
-            <line x1="220" y1="130" x2="240" y2="190" stroke="#F5F1E8" stroke-width="0.4" opacity="0.3"/>
-
-            <circle cx="80" cy="80" r="2" fill="#F5F1E8"/>
-            <circle cx="130" cy="105" r="2.4" fill="#F5F1E8"/>
-            <circle cx="180" cy="85" r="2" fill="#F5F1E8" opacity="0.9"/>
-            <circle cx="120" cy="160" r="1.8" fill="#F5F1E8" opacity="0.85"/>
-            <circle cx="220" cy="130" r="2.2" fill="#F5F1E8"/>
-            <circle cx="280" cy="120" r="2" fill="#F5F1E8" opacity="0.9"/>
-            <circle cx="320" cy="170" r="1.8" fill="#F5F1E8" opacity="0.85"/>
-            <circle cx="240" cy="190" r="1.8" fill="#F5F1E8" opacity="0.85"/>
-
-            <circle cx="60" cy="130" r="0.8" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="160" cy="170" r="0.9" fill="#F5F1E8" opacity="0.45"/>
-            <circle cx="200" cy="60" r="0.8" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="290" cy="60" r="0.7" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="350" cy="100" r="0.8" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="180" cy="200" r="0.7" fill="#F5F1E8" opacity="0.4"/>
-            <circle cx="60" cy="50" r="0.6" fill="#F5F1E8" opacity="0.3"/>
-            <circle cx="350" cy="200" r="0.6" fill="#F5F1E8" opacity="0.3"/>
-          </svg>
-          <p class="desc">Everything is remembered. Constellations grow.</p>
-        </div>
-      </div>
-
-      <div class="privacy-card">
-        <div class="head">
-          <span class="label">Privacy Mode</span>
-          <span class="indicator off">○</span>
-        </div>
-        <div class="body">
-          <svg viewBox="0 0 400 240">
-            <!-- existing memory dimmed to ghost -->
-            <g opacity="0.18">
-              <line x1="80" y1="80" x2="130" y2="105" stroke="#F5F1E8" stroke-width="0.4"/>
-              <line x1="130" y1="105" x2="180" y2="85" stroke="#F5F1E8" stroke-width="0.4"/>
-              <line x1="130" y1="105" x2="120" y2="160" stroke="#F5F1E8" stroke-width="0.4"/>
-
-              <circle cx="80" cy="80" r="2" fill="#F5F1E8"/>
-              <circle cx="130" cy="105" r="2.4" fill="#F5F1E8"/>
-              <circle cx="180" cy="85" r="2" fill="#F5F1E8"/>
-              <circle cx="120" cy="160" r="1.8" fill="#F5F1E8"/>
-
-              <circle cx="60" cy="130" r="0.8" fill="#F5F1E8"/>
-              <circle cx="160" cy="170" r="0.9" fill="#F5F1E8"/>
-              <circle cx="200" cy="60" r="0.8" fill="#F5F1E8"/>
-              <circle cx="60" cy="50" r="0.6" fill="#F5F1E8"/>
-            </g>
-            <!-- live, hollow stars: used now, not written -->
-            <g>
-              <line x1="220" y1="130" x2="280" y2="120" stroke="#F5F1E8" stroke-width="0.4" opacity="0.45" stroke-dasharray="2,3"/>
-              <line x1="280" y1="120" x2="320" y2="170" stroke="#F5F1E8" stroke-width="0.4" opacity="0.45" stroke-dasharray="2,3"/>
-              <circle cx="220" cy="130" r="2.6" fill="none" stroke="#F5F1E8" stroke-width="0.7" opacity="0.55"/>
-              <circle cx="280" cy="120" r="2.4" fill="none" stroke="#F5F1E8" stroke-width="0.7" opacity="0.55"/>
-              <circle cx="320" cy="170" r="2.2" fill="none" stroke="#F5F1E8" stroke-width="0.7" opacity="0.55"/>
-              <circle cx="240" cy="190" r="2.2" fill="none" stroke="#F5F1E8" stroke-width="0.7" opacity="0.55"/>
-            </g>
-          </svg>
-          <p class="desc">In sensitive scenes, stars become outlines — used now, never written.</p>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <footer class="foot">superInput · Memory Constellation · A visual concept</footer>
+  <footer class="foot">superInput · Memory Constellation · Interactive concept</footer>
 
 </div>
+
+<script>
+// ============ Floating Bar ============
+const barDisplay = document.getElementById('barDisplay');
+const barCaption = document.getElementById('barCaption');
+const stateBtns = document.querySelectorAll('.state-btn');
+const playBtn = document.getElementById('playBtn');
+
+const captions = {
+  idle: "Resting. A single breath of light. The user forgets it's there.",
+  listening: "Speaking. Each word lights as a new star, inside a small window of sky.",
+  recognized: "<strong>It remembered.</strong> A new word and one it has known for weeks meet in a single line of gold."
+};
+
+function setState(s) {
+  barDisplay.dataset.state = s;
+  barCaption.innerHTML = captions[s];
+  stateBtns.forEach(b => b.classList.toggle('active', b.dataset.target === s));
+}
+
+stateBtns.forEach(btn => btn.addEventListener('click', () => setState(btn.dataset.target)));
+
+let playing = false;
+playBtn.addEventListener('click', async () => {
+  if (playing) return;
+  playing = true;
+  playBtn.textContent = '● Playing…';
+  setState('idle');
+  await sleep(800);
+  setState('listening');
+  await sleep(2200);
+  setState('recognized');
+  await sleep(2800);
+  setState('idle');
+  playing = false;
+  playBtn.textContent = '▶ Play sequence';
+});
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ============ Privacy Toggle ============
+const universeFrame = document.getElementById('universeFrame');
+const privacyToggle = document.getElementById('privacyToggle');
+const privacyLabel = document.getElementById('privacyLabel');
+const universeMeta = document.getElementById('universeMeta');
+
+privacyToggle.addEventListener('click', () => {
+  const isPrivate = universeFrame.classList.toggle('privacy-mode');
+  privacyLabel.textContent = isPrivate ? 'Privacy Mode' : 'Memory On';
+  universeMeta.textContent = isPrivate
+    ? 'Sensitive scene · used now, never written'
+    : '247 words remembered · 12 style habits · 5 scenes';
+});
+
+// ============ Star Tooltips ============
+const starTip = document.getElementById('starTip');
+const tipWord = document.getElementById('tipWord');
+const tipMeta = document.getElementById('tipMeta');
+const canvasWrap = document.querySelector('.canvas-wrap');
+
+document.querySelectorAll('.bright-star[data-word]').forEach(star => {
+  star.addEventListener('mouseenter', (e) => {
+    tipWord.textContent = star.dataset.word;
+    tipMeta.textContent = star.dataset.meta || '';
+    starTip.classList.add('show');
+    moveTip(e);
+  });
+  star.addEventListener('mousemove', moveTip);
+  star.addEventListener('mouseleave', () => starTip.classList.remove('show'));
+});
+
+function moveTip(e) {
+  const rect = canvasWrap.getBoundingClientRect();
+  starTip.style.left = (e.clientX - rect.left) + 'px';
+  starTip.style.top = (e.clientY - rect.top) + 'px';
+}
+
+// ============ Time Slider ============
+const sliderHandle = document.getElementById('sliderHandle');
+const sliderFill = document.getElementById('sliderFill');
+const sliderWrap = document.querySelector('.slider-wrap');
+const dayLabelRight = document.getElementById('dayLabelRight');
+
+// assign random "discovered day" 1..90 to field stars; bright stars stay visible
+document.querySelectorAll('.universe-canvas .field-star').forEach(s => {
+  s.dataset.day = Math.floor(Math.random() * 88) + 2;
+});
+document.querySelectorAll('.universe-canvas .bright-star').forEach(s => {
+  // bright stars discovered earlier in life — spread 1..70
+  s.dataset.day = Math.floor(Math.random() * 70) + 1;
+});
+
+let dragging = false;
+let currentDay = 90;
+
+function setDay(day) {
+  currentDay = Math.max(1, Math.min(90, day));
+  const pct = (currentDay / 90) * 100;
+  sliderHandle.style.left = pct + '%';
+  sliderFill.style.width = pct + '%';
+  dayLabelRight.textContent = currentDay === 90 ? 'Today' : `Day ${currentDay}`;
+  document.querySelectorAll('.universe-canvas circle[data-day]').forEach(s => {
+    const d = +s.dataset.day;
+    s.style.opacity = d <= currentDay ? '' : '0';
+  });
+  // also dim cluster lines proportionally? skip for now
+}
+
+sliderHandle.addEventListener('mousedown', (e) => {
+  dragging = true;
+  e.preventDefault();
+});
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const rect = sliderWrap.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  setDay(Math.round(pct * 90));
+});
+window.addEventListener('mouseup', () => dragging = false);
+sliderWrap.addEventListener('click', (e) => {
+  if (e.target === sliderHandle) return;
+  const rect = sliderWrap.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  setDay(Math.round(pct * 90));
+});
+
+// init
+document.querySelectorAll('.universe-canvas circle').forEach(s => {
+  s.style.transition = 'opacity 0.4s ease';
+});
+</script>
 </body>
 </html>
