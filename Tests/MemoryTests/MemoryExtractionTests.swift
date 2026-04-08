@@ -130,6 +130,7 @@ struct MemoryExtractionTests {
 
         let scene = try #require(memories.first { $0.type == .scene })
         #expect(scene.key == "scene:com.apple.mail:inbox thread")
+        #expect(scene.valueFingerprint == "Inbox Thread")
         #expect(scene.scope == .field(
             appIdentifier: "com.apple.mail",
             windowTitle: "Reply",
@@ -156,6 +157,7 @@ struct MemoryExtractionTests {
 
         let scene = try #require(memories.first { $0.type == .scene })
         #expect(scene.key == "scene:com.apple.mail:draft reply")
+        #expect(scene.valueFingerprint == "Draft Reply")
         #expect(scene.scope == .field(
             appIdentifier: "com.apple.mail",
             windowTitle: "Draft Reply",
@@ -182,6 +184,7 @@ struct MemoryExtractionTests {
 
         let scene = try #require(memories.first { $0.type == .scene })
         #expect(scene.key == "scene:com.apple.notes:notes")
+        #expect(scene.valueFingerprint == "Notes")
         #expect(scene.scope == .app("com.apple.notes"))
     }
 

@@ -75,7 +75,7 @@ public struct DefaultMemoryExtractor: MemoryExtractor {
         return makeMemory(
             type: .scene,
             key: "scene:\(event.appIdentifier):\(normalized(descriptor.label))",
-            payload: event.fieldRole,
+            payload: descriptor.label,
             scope: descriptor.scope,
             confidence: confidence,
             sourceEventID: event.id,
