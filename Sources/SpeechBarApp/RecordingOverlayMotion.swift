@@ -42,27 +42,8 @@ enum RecordingOverlayMotion {
         )
     }
 
-    static func starOpacity(index: Int, phase: TimeInterval, intensity: Double) -> Double {
-        let clampedIntensity = min(max(intensity, 0), 1)
-        let seed = ambientStars[index % ambientStars.count].seed
-        let shimmer = 0.08 * sin((phase * 0.86) + seed + Double(index) * 0.41)
-        let base = 0.14 + (clampedIntensity * 0.10)
-
-        return min(max(base + shimmer, 0.08), 0.34)
-    }
-
     static func edgeGlowOpacity(intensity: Double) -> Double {
         let clampedIntensity = min(max(intensity, 0), 1)
         return 0.10 + (clampedIntensity * 0.18)
-    }
-
-    static func edgeGlowBlurRadius(intensity: Double) -> CGFloat {
-        let clampedIntensity = min(max(intensity, 0), 1)
-        return CGFloat(4 + (clampedIntensity * 6))
-    }
-
-    static func nebulaOpacity(intensity: Double) -> Double {
-        let clampedIntensity = min(max(intensity, 0), 1)
-        return 0.06 + (clampedIntensity * 0.14)
     }
 }

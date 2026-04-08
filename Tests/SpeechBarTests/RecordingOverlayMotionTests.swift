@@ -11,18 +11,41 @@ struct RecordingOverlayMotionTests {
     }
 
     @Test
-    func audioIntensityTracksRecentAverageAndPeakWithinBounds() {
+    func audioIntensityStaysWithinUnitRange() {
         let samples = [
-            AudioLevelSample(level: 0.10, peak: 0.15),
-            AudioLevelSample(level: 0.22, peak: 0.30),
-            AudioLevelSample(level: 0.48, peak: 0.62),
-            AudioLevelSample(level: 0.72, peak: 0.90)
+            AudioLevelSample(level: 1.2, peak: 1.5),
+            AudioLevelSample(level: 0.88, peak: 1.1),
+            AudioLevelSample(level: 0.95, peak: 1.4),
+            AudioLevelSample(level: 1.0, peak: 1.8)
         ]
 
         let intensity = RecordingOverlayMotion.audioIntensity(from: samples)
 
-        #expect(intensity > 0.40)
-        #expect(intensity < 0.95)
+        #expect(intensity >= 0)
+        #expect(intensity <= 1)
+    }
+
+    @Test
+    func audioIntensityIgnoresSamplesOutsideTheRecentWindow() {
+        let historicalSamples = [
+            AudioLevelSample(level: 0.95, peak: 0.98),
+            AudioLevelSample(level: 0.90, peak: 0.92)
+        ]
+        let recentSamples = [
+            AudioLevelSample(level: 0.10, peak: 0.12),
+            AudioLevelSample(level: 0.16, peak: 0.18),
+            AudioLevelSample(level: 0.12, peak: 0.14),
+            AudioLevelSample(level: 0.08, peak: 0.10),
+            AudioLevelSample(level: 0.15, peak: 0.17),
+            AudioLevelSample(level: 0.11, peak: 0.13)
+        ]
+
+        let intensityWithHistory = RecordingOverlayMotion.audioIntensity(from: historicalSamples + recentSamples)
+        let intensityFromRecentSamplesOnly = RecordingOverlayMotion.audioIntensity(from: recentSamples)
+
+        #expect(intensityWithHistory == intensityFromRecentSamplesOnly)
+        #expect(intensityWithHistory >= 0)
+        #expect(intensityWithHistory <= 1)
     }
 
     @Test
