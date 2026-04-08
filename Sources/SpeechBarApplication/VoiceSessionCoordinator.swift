@@ -20,6 +20,8 @@ private func performanceLog(_ message: String) {
 
 @MainActor
 public final class VoiceSessionCoordinator: ObservableObject {
+    private static let audioLevelUIUpdateMinimumInterval: TimeInterval = 0.05
+
     @Published public private(set) var sessionState: SpeechSessionState = .idle
     @Published public private(set) var rawFinalTranscript = ""
     @Published public private(set) var interimTranscript = ""
@@ -70,6 +72,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private var isCompletingActiveSession = false
     private var finalSegments: [String] = []
     private var activeRecallBundle: RecallBundle?
+    private var lastAudioLevelWindowUpdateAt: Date?
 
     public init(
         hardwareSource: any HardwareEventSource,
@@ -277,6 +280,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         overlayPhase = .recording
         overlaySubtitle = "Listening"
         audioLevelWindow = []
+        lastAudioLevelWindowUpdateAt = nil
 
         let apiKey: String
         do {
@@ -557,6 +561,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         overlayPhase = .failed
         overlaySubtitle = message
         audioLevelWindow = []
+        lastAudioLevelWindowUpdateAt = nil
         activeInputHints = []
     }
 
@@ -575,6 +580,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeFinalizeStartedAt = nil
         activeRecallBundle = nil
         audioLevelWindow = []
+        lastAudioLevelWindowUpdateAt = nil
 
         await audioInputSource.stopCapture()
         await transcriptionClient.close()
@@ -603,11 +609,16 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private func handleAudioLevel(_ sample: AudioLevelSample) {
         guard activeSessionID != nil else { return }
         guard overlayPhase == .recording else { return }
+        if let lastAudioLevelWindowUpdateAt,
+           sample.capturedAt.timeIntervalSince(lastAudioLevelWindowUpdateAt) < Self.audioLevelUIUpdateMinimumInterval {
+            return
+        }
 
         audioLevelWindow.append(sample)
         if audioLevelWindow.count > 24 {
             audioLevelWindow.removeFirst(audioLevelWindow.count - 24)
         }
+        lastAudioLevelWindowUpdateAt = sample.capturedAt
     }
 
     private func currentUserProfileContext() async -> UserProfileContext {

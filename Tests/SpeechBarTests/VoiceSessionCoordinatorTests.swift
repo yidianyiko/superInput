@@ -514,6 +514,90 @@ struct VoiceSessionCoordinatorTests {
 
     @Test
     @MainActor
+    func highFrequencyAudioLevelsAreCoalescedToReduceUIRefreshPressure() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        let startedAt = Date()
+        for index in 0..<12 {
+            audio.emit(
+                level: AudioLevelSample(
+                    level: Double(index + 1) / 12.0,
+                    peak: Double(index + 1) / 12.0,
+                    capturedAt: startedAt.addingTimeInterval(Double(index) * 0.01)
+                )
+            )
+        }
+
+        try await eventually {
+            !coordinator.audioLevelWindow.isEmpty
+        }
+
+        #expect(coordinator.audioLevelWindow.count == 3)
+    }
+
+    @Test
+    @MainActor
+    func spacedAudioLevelsStillPopulateTheWaveformWindow() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        let startedAt = Date()
+        for index in 0..<3 {
+            audio.emit(
+                level: AudioLevelSample(
+                    level: Double(index + 1) / 3.0,
+                    peak: Double(index + 1) / 3.0,
+                    capturedAt: startedAt.addingTimeInterval(Double(index) * 0.08)
+                )
+            )
+        }
+
+        try await eventually {
+            coordinator.audioLevelWindow.count == 3
+        }
+    }
+
+    @Test
+    @MainActor
     func optedOutFieldLabelsClassifyRecordedEventAsOptOut() async throws {
         let hardware = MockHardwareEventSource()
         let audio = MockAudioInputSource()
