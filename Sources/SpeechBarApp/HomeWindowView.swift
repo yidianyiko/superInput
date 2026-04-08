@@ -183,7 +183,8 @@ struct HomeWindowView: View {
             MemoryConstellationScreen(
                 constellationStore: memoryConstellationStore,
                 userProfileStore: userProfileStore,
-                memoryFeatureFlagStore: memoryFeatureFlagStore
+                memoryFeatureFlagStore: memoryFeatureFlagStore,
+                completedTranscript: coordinator.lastCompletedTranscript
             )
         case .model:
             modelPage

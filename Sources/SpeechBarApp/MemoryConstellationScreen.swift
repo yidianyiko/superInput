@@ -1,9 +1,12 @@
+import Foundation
+import SpeechBarDomain
 import SwiftUI
 
 struct MemoryConstellationScreen: View {
     @ObservedObject var constellationStore: MemoryConstellationStore
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
+    let completedTranscript: PublishedTranscript?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -25,6 +28,7 @@ struct MemoryConstellationScreen: View {
                 snapshot: constellationStore.snapshot,
                 focus: constellationStore.focus,
                 selectedViewMode: constellationStore.selectedViewMode,
+                capturePulseToken: constellationStore.capturePulseToken,
                 hoverCluster: constellationStore.hoverCluster,
                 focusBridge: constellationStore.focusBridge
             )
@@ -62,6 +66,14 @@ struct MemoryConstellationScreen: View {
         }
         .onChange(of: memoryFeatureFlagStore.displayMode) { _ in
             constellationStore.refreshPresentation()
+        }
+        .onChange(of: completedTranscript) { transcript in
+            guard let transcript else { return }
+            constellationStore.registerCompletedTranscriptPulse(transcript)
+            Task {
+                try? await Task.sleep(for: .milliseconds(320))
+                await constellationStore.reload()
+            }
         }
     }
 

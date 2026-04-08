@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import MemoryDomain
+import SpeechBarDomain
 
 @MainActor
 final class MemoryConstellationStore: ObservableObject {
@@ -9,6 +10,7 @@ final class MemoryConstellationStore: ObservableObject {
     @Published private(set) var selectedTimelineWindowID: String? = nil
     @Published private(set) var selectedFilter: MemoryConstellationClusterFilter = .all
     @Published private(set) var selectedViewMode: MemoryConstellationViewMode = .clusterMap
+    @Published private(set) var capturePulseToken = 0
 
     private let catalog: (any MemoryCatalogProviding)?
     private let featureFlags: MemoryFeatureFlagStore
@@ -16,6 +18,7 @@ final class MemoryConstellationStore: ObservableObject {
     private var memories: [MemoryItem] = []
     private let demoPresentationMemoryCount = 30
     private let minimumLiveMemoryCountForRealOnlyPresentation = 5
+    private var lastPulsedTranscriptAt: Date?
 
     init(
         catalog: (any MemoryCatalogProviding)?,
@@ -76,6 +79,15 @@ final class MemoryConstellationStore: ObservableObject {
 
     func refreshPresentation() {
         rebuildSnapshot()
+    }
+
+    func registerCompletedTranscriptPulse(_ transcript: PublishedTranscript) {
+        guard lastPulsedTranscriptAt != transcript.createdAt else {
+            return
+        }
+
+        lastPulsedTranscriptAt = transcript.createdAt
+        capturePulseToken &+= 1
     }
 
     private func rebuildSnapshot() {
