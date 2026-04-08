@@ -67,27 +67,76 @@ public struct DefaultMemoryExtractor: MemoryExtractor {
     }
 
     private func sceneMemory(from event: InputEvent) -> MemoryItem? {
-        guard let label = event.fieldLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !label.isEmpty else {
+        guard let descriptor = sceneDescriptor(from: event) else {
             return nil
         }
 
         let confidence = event.hasConfirmedFinalText ? 0.65 : 0.45
         return makeMemory(
             type: .scene,
-            key: "scene:\(event.appIdentifier):\(normalized(label))",
+            key: "scene:\(event.appIdentifier):\(normalized(descriptor.label))",
             payload: event.fieldRole,
-            scope: .field(
-                appIdentifier: event.appIdentifier,
-                windowTitle: event.windowTitle,
-                fieldRole: event.fieldRole,
-                fieldLabel: event.fieldLabel
-            ),
+            scope: descriptor.scope,
             confidence: confidence,
             sourceEventID: event.id,
             timestamp: event.timestamp,
             confirmedAt: event.hasConfirmedFinalText ? event.timestamp : nil
         )
+    }
+
+    private func sceneDescriptor(from event: InputEvent) -> (label: String, scope: MemoryScope)? {
+        if let fieldLabel = trimmed(event.fieldLabel) {
+            return (
+                label: fieldLabel,
+                scope: .field(
+                    appIdentifier: event.appIdentifier,
+                    windowTitle: event.windowTitle,
+                    fieldRole: event.fieldRole,
+                    fieldLabel: fieldLabel
+                )
+            )
+        }
+        if let pageTitle = trimmed(event.pageTitle) {
+            return (
+                label: pageTitle,
+                scope: .field(
+                    appIdentifier: event.appIdentifier,
+                    windowTitle: event.windowTitle,
+                    fieldRole: event.fieldRole,
+                    fieldLabel: nil
+                )
+            )
+        }
+        if let windowTitle = trimmed(event.windowTitle) {
+            return (
+                label: windowTitle,
+                scope: .field(
+                    appIdentifier: event.appIdentifier,
+                    windowTitle: event.windowTitle,
+                    fieldRole: event.fieldRole,
+                    fieldLabel: nil
+                )
+            )
+        }
+        if let appName = trimmed(event.appName) {
+            return (
+                label: appName,
+                scope: .app(event.appIdentifier)
+            )
+        }
+        return nil
+    }
+
+    private func trimmed(_ value: String?) -> String? {
+        guard let value else {
+            return nil
+        }
+
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedValue.isEmpty else {
+            return nil
+        }
+        return trimmedValue
     }
 
     private func styleMemory(from event: InputEvent) -> MemoryItem? {

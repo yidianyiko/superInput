@@ -111,6 +111,120 @@ struct MemoryExtractionTests {
         #expect(style.scope == .app("com.apple.TextEdit"))
         #expect(style.confidence == 0.65)
     }
+
+    @Test
+    func pageTitleFallbackCreatesSceneMemoryWithoutFieldLabel() async throws {
+        let extractor = DefaultMemoryExtractor()
+        let event = makeEvent(
+            appIdentifier: "com.apple.mail",
+            appName: "Mail",
+            windowTitle: "Reply",
+            pageTitle: "Inbox Thread",
+            fieldLabel: nil,
+            rawTranscript: "reply soon",
+            insertedText: "reply soon",
+            finalUserEditedText: "reply soon"
+        )
+
+        let memories = try await extractor.extract(from: event)
+
+        let scene = try #require(memories.first { $0.type == .scene })
+        #expect(scene.key == "scene:com.apple.mail:inbox thread")
+        #expect(scene.scope == .field(
+            appIdentifier: "com.apple.mail",
+            windowTitle: "Reply",
+            fieldRole: "AXTextArea",
+            fieldLabel: nil
+        ))
+    }
+
+    @Test
+    func windowTitleFallbackCreatesSceneMemoryWhenPageTitleMissing() async throws {
+        let extractor = DefaultMemoryExtractor()
+        let event = makeEvent(
+            appIdentifier: "com.apple.mail",
+            appName: "Mail",
+            windowTitle: "Draft Reply",
+            pageTitle: nil,
+            fieldLabel: nil,
+            rawTranscript: "ship tomorrow",
+            insertedText: "ship tomorrow",
+            finalUserEditedText: "ship tomorrow"
+        )
+
+        let memories = try await extractor.extract(from: event)
+
+        let scene = try #require(memories.first { $0.type == .scene })
+        #expect(scene.key == "scene:com.apple.mail:draft reply")
+        #expect(scene.scope == .field(
+            appIdentifier: "com.apple.mail",
+            windowTitle: "Draft Reply",
+            fieldRole: "AXTextArea",
+            fieldLabel: nil
+        ))
+    }
+
+    @Test
+    func appNameFallbackCreatesAppScopedSceneMemoryWhenNoOtherContextExists() async throws {
+        let extractor = DefaultMemoryExtractor()
+        let event = makeEvent(
+            appIdentifier: "com.apple.notes",
+            appName: "Notes",
+            windowTitle: nil,
+            pageTitle: nil,
+            fieldLabel: nil,
+            rawTranscript: "buy milk",
+            insertedText: "buy milk",
+            finalUserEditedText: "buy milk"
+        )
+
+        let memories = try await extractor.extract(from: event)
+
+        let scene = try #require(memories.first { $0.type == .scene })
+        #expect(scene.key == "scene:com.apple.notes:notes")
+        #expect(scene.scope == .app("com.apple.notes"))
+    }
+
+    @Test
+    func sparseMetadataTranscribeEventProducesAllFourMemoryTypes() async throws {
+        let extractor = DefaultMemoryExtractor()
+        let event = makeEvent(
+            appIdentifier: "com.apple.mail",
+            appName: "Mail",
+            windowTitle: "Draft Reply",
+            pageTitle: nil,
+            fieldLabel: nil,
+            rawTranscript: "open ai roadmap",
+            insertedText: "open ai roadmap",
+            finalUserEditedText: "OpenAI roadmap"
+        )
+
+        let memories = try await extractor.extract(from: event)
+
+        #expect(memories.count == 4)
+        #expect(Set(memories.map(\.type)) == [.correction, .vocabulary, .scene, .style])
+    }
+
+    @Test
+    func secureExcludedEventStillProducesNoMemories() async throws {
+        let extractor = DefaultMemoryExtractor()
+        let event = makeEvent(
+            appIdentifier: "com.1password.1password",
+            appName: "1Password",
+            windowTitle: "Sign In",
+            fieldRole: "AXSecureTextField",
+            fieldLabel: "Password",
+            sensitivityClass: .secureExcluded,
+            observationStatus: .blockedSensitive,
+            rawTranscript: nil,
+            insertedText: nil,
+            finalUserEditedText: nil
+        )
+
+        let memories = try await extractor.extract(from: event)
+
+        #expect(memories.isEmpty)
+    }
 }
 
 private func makeEvent(
