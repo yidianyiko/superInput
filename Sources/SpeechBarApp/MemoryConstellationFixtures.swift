@@ -11,29 +11,29 @@ enum MemoryScenario: String, CaseIterable, Sendable {
 }
 
 enum MemoryConstellationFixtures {
-    static func catalogProvider(for scenario: MemoryScenario) -> any MemoryCatalogProviding {
-        StaticMemoryCatalogProvider(memories: memories(for: scenario))
+    static func catalogProvider(for scenario: MemoryScenario, now: Date) -> any MemoryCatalogProviding {
+        StaticMemoryCatalogProvider(memories: memories(for: scenario, now: now))
     }
 
-    static func memories(for scenario: MemoryScenario) -> [MemoryItem] {
+    static func memories(for scenario: MemoryScenario, now: Date) -> [MemoryItem] {
         switch scenario {
         case .live:
-            return liveMemories()
+            return liveMemories(now: now)
         case .default:
-            return defaultMemories()
+            return defaultMemories(now: now)
         case .sparse:
-            return sparseMemories()
+            return sparseMemories(now: now)
         case .privacy:
-            return privacyMemories()
+            return privacyMemories(now: now)
         case .dominant:
-            return dominantMemories()
+            return dominantMemories(now: now)
         case .noBridge:
-            return noBridgeMemories()
+            return noBridgeMemories(now: now)
         }
     }
 
-    private static func liveMemories() -> [MemoryItem] {
-        defaultMemories() + [
+    private static func liveMemories(now: Date) -> [MemoryItem] {
+        defaultMemories(now: now) + [
             makeMemory(
                 id: uuid("66666666-6666-4666-8666-666666666666"),
                 type: .scene,
@@ -41,13 +41,13 @@ enum MemoryConstellationFixtures {
                 fingerprint: "live review",
                 identityHash: "scene|live-review",
                 confidence: 0.70,
-                updatedAt: 93,
+                updatedAt: now.addingTimeInterval(-7),
                 sourceEventIDs: [uuid("44444444-4444-4444-8444-444444444444")]
             )
         ]
     }
 
-    private static func defaultMemories() -> [MemoryItem] {
+    static func defaultMemories(now: Date) -> [MemoryItem] {
         [
             makeMemory(
                 id: uuid("11111111-1111-4111-8111-111111111111"),
@@ -56,7 +56,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "OpenAI",
                 identityHash: "vocabulary|openai",
                 confidence: 0.92,
-                updatedAt: 95,
+                updatedAt: now.addingTimeInterval(-5),
                 sourceEventIDs: [uuid("aaaaaaa1-0000-4000-8000-000000000001")]
             ),
             makeMemory(
@@ -66,7 +66,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Brevity first",
                 identityHash: "style|brevity",
                 confidence: 0.87,
-                updatedAt: 96,
+                updatedAt: now.addingTimeInterval(-4),
                 sourceEventIDs: [uuid("aaaaaaa1-0000-4000-8000-000000000001"), uuid("aaaaaaa2-0000-4000-8000-000000000002")]
             ),
             makeMemory(
@@ -76,7 +76,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Weekly review",
                 identityHash: "scene|review",
                 confidence: 0.78,
-                updatedAt: 92,
+                updatedAt: now.addingTimeInterval(-8),
                 sourceEventIDs: [uuid("aaaaaaa2-0000-4000-8000-000000000002")]
             ),
             makeMemory(
@@ -86,13 +86,13 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Roadmap",
                 identityHash: "vocabulary|roadmap",
                 confidence: 0.80,
-                updatedAt: 89,
+                updatedAt: now.addingTimeInterval(-11),
                 sourceEventIDs: [uuid("aaaaaaa3-0000-4000-8000-000000000003")]
             )
         ]
     }
 
-    private static func sparseMemories() -> [MemoryItem] {
+    static func sparseMemories(now: Date) -> [MemoryItem] {
         [
             makeMemory(
                 id: uuid("11111111-1111-4111-8111-111111111111"),
@@ -101,23 +101,13 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Sparse vocabulary",
                 identityHash: "vocabulary|single",
                 confidence: 0.61,
-                updatedAt: 90,
+                updatedAt: now.addingTimeInterval(-10),
                 sourceEventIDs: [uuid("bbbbbbb1-0000-4000-8000-000000000001")]
-            ),
-            makeMemory(
-                id: uuid("22222222-2222-4222-8222-222222222222"),
-                type: .scene,
-                key: "scene:single",
-                fingerprint: "Sparse scene",
-                identityHash: "scene|single",
-                confidence: 0.58,
-                updatedAt: 88,
-                sourceEventIDs: [uuid("bbbbbbb2-0000-4000-8000-000000000002")]
             )
         ]
     }
 
-    private static func privacyMemories() -> [MemoryItem] {
+    static func privacyMemories(now: Date) -> [MemoryItem] {
         [
             makeMemory(
                 id: uuid("11111111-1111-4111-8111-111111111111"),
@@ -126,7 +116,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Confidential client name",
                 identityHash: "vocabulary|client-name",
                 confidence: 0.90,
-                updatedAt: 94,
+                updatedAt: now.addingTimeInterval(-6),
                 sourceEventIDs: [uuid("ccccccc1-0000-4000-8000-000000000001")]
             ),
             makeMemory(
@@ -136,7 +126,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Private tone",
                 identityHash: "style|private-tone",
                 confidence: 0.83,
-                updatedAt: 93,
+                updatedAt: now.addingTimeInterval(-7),
                 sourceEventIDs: [uuid("ccccccc1-0000-4000-8000-000000000001"), uuid("ccccccc2-0000-4000-8000-000000000002")]
             ),
             makeMemory(
@@ -146,13 +136,13 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Private deal note",
                 identityHash: "scene|deal",
                 confidence: 0.75,
-                updatedAt: 91,
+                updatedAt: now.addingTimeInterval(-9),
                 sourceEventIDs: [uuid("ccccccc2-0000-4000-8000-000000000002")]
             )
         ]
     }
 
-    private static func dominantMemories() -> [MemoryItem] {
+    static func dominantMemories(now: Date) -> [MemoryItem] {
         [
             makeMemory(
                 id: uuid("10101010-1010-4010-8010-101010101010"),
@@ -161,7 +151,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Core term 1",
                 identityHash: "vocabulary|core-1",
                 confidence: 0.94,
-                updatedAt: 98,
+                updatedAt: now.addingTimeInterval(-2),
                 sourceEventIDs: [uuid("ddddddd1-0000-4000-8000-000000000001")]
             ),
             makeMemory(
@@ -171,7 +161,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Core term 2",
                 identityHash: "vocabulary|core-2",
                 confidence: 0.91,
-                updatedAt: 97,
+                updatedAt: now.addingTimeInterval(-3),
                 sourceEventIDs: [uuid("ddddddd2-0000-4000-8000-000000000002")]
             ),
             makeMemory(
@@ -181,7 +171,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Core term 3",
                 identityHash: "vocabulary|core-3",
                 confidence: 0.88,
-                updatedAt: 96,
+                updatedAt: now.addingTimeInterval(-4),
                 sourceEventIDs: [uuid("ddddddd3-0000-4000-8000-000000000003")]
             ),
             makeMemory(
@@ -191,7 +181,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Core term 4",
                 identityHash: "vocabulary|core-4",
                 confidence: 0.86,
-                updatedAt: 95,
+                updatedAt: now.addingTimeInterval(-5),
                 sourceEventIDs: [uuid("ddddddd4-0000-4000-8000-000000000004")]
             ),
             makeMemory(
@@ -201,7 +191,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Dominant tone",
                 identityHash: "style|dominant",
                 confidence: 0.84,
-                updatedAt: 94,
+                updatedAt: now.addingTimeInterval(-6),
                 sourceEventIDs: [uuid("ddddddd1-0000-4000-8000-000000000001"), uuid("ddddddd5-0000-4000-8000-000000000005")]
             ),
             makeMemory(
@@ -211,13 +201,13 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Dominant scene",
                 identityHash: "scene|dominant",
                 confidence: 0.74,
-                updatedAt: 93,
+                updatedAt: now.addingTimeInterval(-7),
                 sourceEventIDs: [uuid("ddddddd5-0000-4000-8000-000000000005")]
             )
         ]
     }
 
-    private static func noBridgeMemories() -> [MemoryItem] {
+    static func noBridgeMemories(now: Date) -> [MemoryItem] {
         [
             makeMemory(
                 id: uuid("11111111-1111-4111-8111-111111111111"),
@@ -226,7 +216,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Isolated vocab",
                 identityHash: "vocabulary|isolated",
                 confidence: 0.67,
-                updatedAt: 90,
+                updatedAt: now.addingTimeInterval(-10),
                 sourceEventIDs: [uuid("eeeeeee1-0000-4000-8000-000000000001")]
             ),
             makeMemory(
@@ -236,7 +226,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Isolated style",
                 identityHash: "style|isolated",
                 confidence: 0.66,
-                updatedAt: 89,
+                updatedAt: now.addingTimeInterval(-11),
                 sourceEventIDs: [uuid("eeeeeee2-0000-4000-8000-000000000002")]
             ),
             makeMemory(
@@ -246,7 +236,7 @@ enum MemoryConstellationFixtures {
                 fingerprint: "Isolated scene",
                 identityHash: "scene|isolated",
                 confidence: 0.65,
-                updatedAt: 88,
+                updatedAt: now.addingTimeInterval(-12),
                 sourceEventIDs: [uuid("eeeeeee3-0000-4000-8000-000000000003")]
             )
         ]
@@ -259,7 +249,7 @@ enum MemoryConstellationFixtures {
         fingerprint: String,
         identityHash: String,
         confidence: Double,
-        updatedAt: TimeInterval,
+        updatedAt: Date,
         sourceEventIDs: [UUID]
     ) -> MemoryItem {
         MemoryItem(
@@ -272,9 +262,9 @@ enum MemoryConstellationFixtures {
             scope: .app("com.slashvibe.snapshot"),
             confidence: confidence,
             status: .active,
-            createdAt: Date(timeIntervalSince1970: updatedAt - 10),
-            updatedAt: Date(timeIntervalSince1970: updatedAt),
-            lastConfirmedAt: Date(timeIntervalSince1970: updatedAt - 5),
+            createdAt: updatedAt.addingTimeInterval(-10),
+            updatedAt: updatedAt,
+            lastConfirmedAt: updatedAt.addingTimeInterval(-5),
             sourceEventIDs: sourceEventIDs
         )
     }

@@ -3,6 +3,7 @@ import Foundation
 import SpeechBarApplication
 import SpeechBarDomain
 import SpeechBarInfrastructure
+import MemoryDomain
 import SwiftUI
 
 enum OffscreenHomeSnapshotRuntime {
@@ -184,6 +185,7 @@ private final class SnapshotEnvironment {
     init(defaults: UserDefaults, command: OffscreenHomeSnapshotCommand) {
         self.defaults = defaults
         self.pushToTalkSource = OnScreenPushToTalkSource()
+        let snapshotNow = Date(timeIntervalSince1970: 100)
 
         let localWhisperModelStore = LocalWhisperModelStore(defaults: defaults)
         localWhisperModelStore.prepareForLaunch(showFirstInstallPrompt: false)
@@ -233,11 +235,17 @@ private final class SnapshotEnvironment {
             self.memoryFeatureFlagStore.displayMode = memoryDisplayMode
         }
 
-        let memoryCatalog = MemoryConstellationFixtures.catalogProvider(for: command.memoryScenario)
+        let memoryCatalog: (any MemoryCatalogProviding)?
+        switch command.memoryScenario {
+        case .live:
+            memoryCatalog = nil
+        default:
+            memoryCatalog = MemoryConstellationFixtures.catalogProvider(for: command.memoryScenario, now: snapshotNow)
+        }
         self.memoryConstellationStore = MemoryConstellationStore(
             catalog: memoryCatalog,
             featureFlags: memoryFeatureFlagStore,
-            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+            builder: MemoryConstellationBuilder(now: { snapshotNow })
         )
         self.diagnosticsCoordinator = DiagnosticsCoordinator(
             baseDirectory: FileManager.default.temporaryDirectory
