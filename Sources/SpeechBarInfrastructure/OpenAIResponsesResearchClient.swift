@@ -57,7 +57,12 @@ public actor OpenAIResponsesResearchClient: TerminologyResearchClient {
         let outputText = try await performRequest(
             configuration: configuration,
             apiKey: apiKey,
-            body: body
+            body: body,
+            fallbackMessages: [
+                OpenAIChatCompletionRequestMessage(role: "system", content: instructions),
+                OpenAIChatCompletionRequestMessage(role: "user", content: prompt)
+            ],
+            fallbackMaxTokens: 2_500
         )
 
         return parseTerminology(from: outputText)
@@ -66,31 +71,19 @@ public actor OpenAIResponsesResearchClient: TerminologyResearchClient {
     private func performRequest(
         configuration: OpenAIResponsesRequestConfiguration,
         apiKey: String,
-        body: [String: Any]
+        body: [String: Any],
+        fallbackMessages: [OpenAIChatCompletionRequestMessage],
+        fallbackMaxTokens: Int
     ) async throws -> String {
-        var request = URLRequest(url: configuration.endpoint)
-        request.httpMethod = "POST"
-        request.timeoutInterval = configuration.timeoutInterval
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw OpenAIResponsesClientError.invalidResponse
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw OpenAIResponsesClientError.badHTTPStatus(httpResponse.statusCode, body)
-        }
-
-        let envelope = try JSONDecoder().decode(OpenAIResponsesEnvelope.self, from: data)
-        let text = envelope.outputText
-        guard !text.isEmpty else {
-            throw OpenAIResponsesClientError.emptyOutput
-        }
-        return text
+        let requestBody = try JSONSerialization.data(withJSONObject: body)
+        return try await performOpenAITextRequest(
+            session: session,
+            configuration: configuration,
+            apiKey: apiKey,
+            responsesBody: requestBody,
+            chatMessages: fallbackMessages,
+            chatMaxTokens: fallbackMaxTokens
+        )
     }
 
     private func parseTerminology(from outputText: String) -> [TerminologyEntry] {
