@@ -6,7 +6,7 @@ import SpeechBarDomain
 @testable import SpeechBarApp
 import SpeechBarApplication
 
-@Suite("RecordingOverlayView")
+@Suite("RecordingOverlayView", .serialized)
 struct RecordingOverlayViewTests {
     @Test
     func decorativeStateUsesFixedMotionValuesWhenReduceMotionIsEnabled() {

@@ -4,7 +4,7 @@ import Testing
 import MemoryDomain
 import SpeechBarDomain
 
-@Suite("VoiceSessionCoordinator")
+@Suite("VoiceSessionCoordinator", .serialized)
 struct VoiceSessionCoordinatorTests {
     @Test
     @MainActor

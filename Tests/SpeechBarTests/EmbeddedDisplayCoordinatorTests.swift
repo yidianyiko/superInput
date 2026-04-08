@@ -4,7 +4,7 @@ import Testing
 import SpeechBarDomain
 import SpeechBarInfrastructure
 
-@Suite("EmbeddedDisplayCoordinator")
+@Suite("EmbeddedDisplayCoordinator", .serialized)
 struct EmbeddedDisplayCoordinatorTests {
     @Test
     @MainActor
