@@ -18,6 +18,18 @@ struct MemoryConstellationSnapshotCommandTests {
     }
 
     @Test
+    func parsesVoltThemeOverrideAndMapsToGreenPreset() throws {
+        let command = try #require(OffscreenHomeSnapshotCommand.parse(arguments: [
+            "speechbar",
+            "--render-home-snapshot",
+            "--theme", "volt"
+        ]))
+
+        #expect(command.theme == .volt)
+        #expect(OffscreenHomeSnapshotCommand.ThemeOverride.volt.themePreset == .green)
+    }
+
+    @Test
     func preloadHelperWaitsForReloadClosureToFinish() async throws {
         let gate = AsyncGate()
         let probe = ReturnProbe()

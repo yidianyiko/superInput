@@ -16,11 +16,13 @@ struct StatusPanelView: View {
     let pushToTalkSource: OnScreenPushToTalkSource
     let openHomeAction: (() -> Void)?
 
-    @AppStorage("home.selectedTheme") private var selectedThemeRaw = HomeWindowStore.ThemePreset.green.rawValue
+    static let defaultThemeRawValue = HomeWindowStore.ThemePreset.green.rawValue
+
+    @AppStorage("home.selectedTheme") private var selectedThemeRaw = Self.defaultThemeRawValue
     @State private var apiKeyInput = ""
 
     private var selectedTheme: HomeWindowStore.ThemePreset {
-        HomeWindowStore.ThemePreset(rawValue: selectedThemeRaw) ?? .green
+        Self.resolvedThemePreset(from: selectedThemeRaw)
     }
 
     private var palette: HomeWindowStore.HomeThemePalette {
@@ -39,11 +41,13 @@ struct StatusPanelView: View {
 
                     HStack(spacing: 12) {
                         CompactStatusCard(
+                            palette: palette,
                             title: "状态",
                             value: sessionTitle,
                             tint: sessionTint
                         )
                         CompactStatusCard(
+                            palette: palette,
                             title: "输出",
                             value: "当前输入框",
                             tint: palette.highlight
@@ -86,29 +90,29 @@ struct StatusPanelView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("SlashVibe")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+                        .foregroundStyle(palette.textPrimary)
                     Text("Voice input")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.black.opacity(0.46))
+                        .foregroundStyle(palette.textSecondary)
                         .textCase(.uppercase)
                         .tracking(1.2)
                     Text("右侧 Command 单击开始，再次单击结束。")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.black.opacity(0.56))
+                        .foregroundStyle(palette.textMuted)
                 }
 
                 Spacer(minLength: 12)
 
                 if let openHomeAction {
                     Button("打开主页", action: openHomeAction)
-                        .buttonStyle(SlashVibeHeroSecondaryButtonStyle())
+                        .buttonStyle(StatusSecondaryButtonStyle(palette: palette))
                 }
             }
 
             HStack(spacing: 8) {
-                SmallTag(title: "模型", value: modelSettingsStore.selectedSpeechProviderName, tint: palette.accent, filled: true)
-                SmallTag(title: "语言", value: modelSettingsStore.currentSpeechLanguage, tint: palette.highlight, filled: true)
-                SmallTag(title: "转写", value: modelSettingsStore.currentSpeechModel, tint: palette.accentSecondary, filled: true)
+                SmallTag(palette: palette, title: "模型", value: modelSettingsStore.selectedSpeechProviderName, tint: palette.accent, filled: true)
+                SmallTag(palette: palette, title: "语言", value: modelSettingsStore.currentSpeechLanguage, tint: palette.highlight, filled: true)
+                SmallTag(palette: palette, title: "转写", value: modelSettingsStore.currentSpeechModel, tint: palette.accentSecondary, filled: true)
             }
         }
         .padding(16)
@@ -138,7 +142,8 @@ struct StatusPanelView: View {
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 5)
-                                .background(Color.white.opacity(0.12), in: Capsule())
+                                .background(palette.controlFill, in: Capsule())
+                                .foregroundStyle(palette.controlText)
                             Spacer()
                             Image(systemName: isRecordingFlowActive ? "waveform.circle.fill" : "mic.circle.fill")
                                 .font(.system(size: 22, weight: .bold))
@@ -159,7 +164,7 @@ struct StatusPanelView: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                        .stroke(palette.controlStroke, lineWidth: 1)
                 )
                 .frame(height: 106)
                 .opacity(isActionDisabled ? 0.55 : 1.0)
@@ -174,26 +179,27 @@ struct StatusPanelView: View {
                 HStack {
                     Text("监控摘要")
                         .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(palette.textPrimary)
                     Spacer()
                     Text(transportStatusTitle)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(embeddedDisplayCoordinator.connectionState.phase == .ready ? .green : .secondary)
+                        .foregroundStyle(embeddedDisplayCoordinator.connectionState.phase == .ready ? palette.accent : palette.textSecondary)
                 }
 
                 HStack(spacing: 10) {
-                    SmallTag(title: "任务", value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.count)", tint: palette.accent)
-                    SmallTag(title: "审批", value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.filter { $0.boardState == .approve }.count)", tint: palette.highlight)
-                    SmallTag(title: "异常", value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.filter { $0.boardState == .error }.count)", tint: palette.accentSecondary)
+                    SmallTag(palette: palette, title: "任务", value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.count)", tint: palette.accent)
+                    SmallTag(palette: palette, title: "审批", value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.filter { $0.boardState == .approve }.count)", tint: palette.highlight)
+                    SmallTag(palette: palette, title: "异常", value: "\(agentMonitorCoordinator.taskBoardSnapshot.cards.filter { $0.boardState == .error }.count)", tint: palette.accentSecondary)
                 }
 
                 HStack {
                     Text("最近发送")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                     Spacer()
                     Text(embeddedDisplayCoordinator.lastSentAt.map(shortTimestamp) ?? "暂无")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                 }
 
                 if let openHomeAction {
@@ -210,20 +216,23 @@ struct StatusPanelView: View {
                 HStack {
                     Text("文本预览")
                         .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(palette.textPrimary)
                     Spacer()
                     Text(coordinator.statusMessage)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(palette.textSecondary)
                         .lineLimit(1)
                 }
 
                 PreviewBubble(
+                    palette: palette,
                     title: "临时",
                     text: coordinator.interimTranscript,
                     placeholder: "录音时显示临时识别内容。"
                 )
 
                 PreviewBubble(
+                    palette: palette,
                     title: "最终",
                     text: coordinator.finalTranscript,
                     placeholder: "结束录音后显示最终文本。"
@@ -233,12 +242,12 @@ struct StatusPanelView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("本次记忆提示")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.textSecondary)
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(coordinator.activeInputHints, id: \.self) { hint in
-                                    SmallTag(title: "记忆", value: hint, tint: palette.highlight)
+                                    SmallTag(palette: palette, title: "记忆", value: hint, tint: palette.highlight)
                                 }
                             }
                         }
@@ -253,13 +262,16 @@ struct StatusPanelView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("权限")
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(palette.textPrimary)
 
                 StatusRow(
+                    palette: palette,
                     label: "辅助功能",
                     value: AccessibilityPermissionManager.isTrusted() ? "已授权" : "待授权",
                     tint: AccessibilityPermissionManager.isTrusted() ? .green : .orange
                 )
                 StatusRow(
+                    palette: palette,
                     label: "麦克风",
                     value: audioInputSettingsStore.selectionSummary,
                     tint: palette.highlight
@@ -283,6 +295,7 @@ struct StatusPanelView: View {
                     HStack {
                         Text("本地模型")
                             .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(palette.textPrimary)
                         Spacer()
                         Text(coordinator.credentialStatus == .available ? "已安装" : "未安装")
                             .font(.system(size: 11, weight: .semibold))
@@ -295,13 +308,13 @@ struct StatusPanelView: View {
                             : selectedLocalInstallHint
                     )
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
 
                     if selectedLocalProviderIsDownloading {
                         ProgressView(value: selectedLocalDownloadProgress)
                         Text("\(Int(selectedLocalDownloadProgress * 100))%")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(palette.textSecondary)
                     }
 
                     if let openHomeAction {
@@ -317,6 +330,7 @@ struct StatusPanelView: View {
                     HStack {
                         Text(modelSettingsStore.currentSpeechCredentialLabel)
                             .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(palette.textPrimary)
                         Spacer()
                         Text(coordinator.credentialStatus == .available ? "已保存" : "缺失")
                             .font(.system(size: 11, weight: .semibold))
@@ -362,10 +376,11 @@ struct StatusPanelView: View {
                 HStack {
                     Text("AI 后处理")
                         .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(palette.textPrimary)
                     Spacer()
                     Text(polishSummary)
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(userProfileStore.isPolishEnabled ? palette.accent : .secondary)
+                        .foregroundStyle(userProfileStore.isPolishEnabled ? palette.accent : palette.textSecondary)
                 }
 
                 Toggle("录音结束后润色文本", isOn: polishEnabledBinding)
@@ -383,11 +398,11 @@ struct StatusPanelView: View {
                         polishDescription
                     )
                     .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textSecondary)
                 } else {
                     Text("关闭后会直接使用原始转写，速度最快。")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+                        .font(.system(size: 12))
+                        .foregroundStyle(palette.textSecondary)
                 }
 
                 HStack(spacing: 8) {
@@ -404,7 +419,7 @@ struct StatusPanelView: View {
 
                 Text(userProfileStore.terminologyStatusMessage)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(palette.textMuted)
             }
         }
     }
@@ -617,6 +632,7 @@ private struct PanelCard<Content: View>: View {
 }
 
 private struct CompactStatusCard: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let title: String
     let value: String
     let tint: Color
@@ -625,26 +641,28 @@ private struct CompactStatusCard: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
             HStack(spacing: 8) {
                 Circle()
                     .fill(tint)
                     .frame(width: 8, height: 8)
                 Text(value)
                     .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(palette.textPrimary)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(palette.elevatedFill, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.55), lineWidth: 1)
+                .stroke(palette.controlStroke, lineWidth: 1)
         )
     }
 }
 
 private struct SmallTag: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let title: String
     let value: String
     let tint: Color
@@ -654,25 +672,26 @@ private struct SmallTag: View {
         HStack(spacing: 5) {
             Text(title)
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(filled ? tint.opacity(0.65) : .secondary)
+                .foregroundStyle(filled ? palette.controlText.opacity(0.78) : palette.textSecondary)
             Text(value)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(tint)
+                .foregroundStyle(filled ? palette.controlText : tint)
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 6)
         .background(
-            filled ? Color.white.opacity(0.10) : Color.white.opacity(0.88),
+            filled ? palette.controlFill : palette.elevatedFill,
             in: Capsule()
         )
         .overlay(
             Capsule()
-                .stroke(filled ? Color.white.opacity(0.14) : Color.clear, lineWidth: 1)
+                .stroke(filled ? palette.controlStroke : palette.border, lineWidth: 1)
         )
     }
 }
 
 private struct PreviewBubble: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let title: String
     let text: String
     let placeholder: String
@@ -681,14 +700,14 @@ private struct PreviewBubble: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(palette.textSecondary)
 
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.9))
+                .fill(palette.elevatedFill)
                 .overlay(alignment: .topLeading) {
                     Text(text.isEmpty ? placeholder : text)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(text.isEmpty ? .secondary : .primary)
+                        .foregroundStyle(text.isEmpty ? palette.textSecondary : palette.textPrimary)
                         .padding(10)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .lineLimit(3)
@@ -696,7 +715,7 @@ private struct PreviewBubble: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                        .stroke(palette.controlStroke, lineWidth: 1)
                 )
                 .frame(height: 60)
         }
@@ -704,6 +723,7 @@ private struct PreviewBubble: View {
 }
 
 private struct StatusRow: View {
+    let palette: HomeWindowStore.HomeThemePalette
     let label: String
     let value: String
     let tint: Color
@@ -712,13 +732,14 @@ private struct StatusRow: View {
         HStack {
             Text(label)
                 .font(.system(size: 12))
+                .foregroundStyle(palette.textPrimary)
             Spacer()
             Text(value)
                 .font(.system(size: 11, weight: .semibold))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(tint.opacity(0.12), in: Capsule())
-                .foregroundStyle(tint)
+                .foregroundStyle(palette.controlText)
         }
     }
 }
@@ -748,12 +769,21 @@ private struct StatusSecondaryButtonStyle: ButtonStyle {
             .font(.system(size: 12, weight: .semibold))
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
-            .background(Color.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(palette.border.opacity(0.75), lineWidth: 1)
+                    .stroke(palette.controlStroke, lineWidth: 1)
             )
-            .foregroundStyle(.primary)
+            .foregroundStyle(palette.controlText)
             .opacity(configuration.isPressed ? 0.9 : 1.0)
+    }
+}
+
+extension StatusPanelView {
+    static func resolvedThemePreset(from rawValue: String?) -> HomeWindowStore.ThemePreset {
+        guard let rawValue, let theme = HomeWindowStore.ThemePreset(rawValue: rawValue) else {
+            return .green
+        }
+        return theme
     }
 }

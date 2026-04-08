@@ -31,6 +31,7 @@ struct OffscreenHomeSnapshotCommand: Sendable {
 
     enum ThemeOverride: String, Sendable {
         case green
+        case volt
         case apple
         case sunrise
         case ocean
@@ -310,7 +311,7 @@ private final class SnapshotEnvironment {
             self.homeStore.saveSelectedSection(section)
         }
 
-        if let theme = command.theme.flatMap(Self.mapTheme(from:)) {
+        if let theme = command.theme?.themePreset {
             self.homeStore.selectedTheme = theme
         }
     }
@@ -332,9 +333,12 @@ private final class SnapshotEnvironment {
         }
     }
 
-    private static func mapTheme(from override: OffscreenHomeSnapshotCommand.ThemeOverride) -> HomeWindowStore.ThemePreset {
-        switch override {
-        case .green:
+}
+
+extension OffscreenHomeSnapshotCommand.ThemeOverride {
+    var themePreset: HomeWindowStore.ThemePreset {
+        switch self {
+        case .green, .volt:
             return .green
         case .apple:
             return .apple
