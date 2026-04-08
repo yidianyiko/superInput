@@ -9,6 +9,7 @@ xcuserdata/
 *.xcuserstate
 .swiftpm/
 .worktrees/
+.superpowers/
 .idea/
 .vscode/
 .env
