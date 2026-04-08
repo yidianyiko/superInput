@@ -148,20 +148,52 @@ final class RecordingOverlayController: NSObject {
     }
 }
 
-private struct RecordingOverlayView: View {
+struct RecordingOverlayView: View {
+    struct DecorativeState: Equatable {
+        let shouldAnimateTimeline: Bool
+        let decorativeIntensity: Double
+    }
+
+    nonisolated static let reducedMotionDecorativeIntensity = 0.22
+
+    nonisolated static func decorativeState(
+        overlayPhase: RecordingOverlayPhase,
+        reduceMotion: Bool,
+        samples: [AudioLevelSample]
+    ) -> DecorativeState {
+        let isRecording = overlayPhase == .recording
+        return DecorativeState(
+            shouldAnimateTimeline: isRecording && !reduceMotion,
+            decorativeIntensity: reduceMotion
+                ? reducedMotionDecorativeIntensity
+                : RecordingOverlayMotion.audioIntensity(from: samples)
+        )
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var coordinator: VoiceSessionCoordinator
 
     var body: some View {
-        Group {
+        let decorativeState = Self.decorativeState(
+            overlayPhase: coordinator.overlayPhase,
+            reduceMotion: reduceMotion,
+            samples: coordinator.audioLevelWindow
+        )
+
+        return TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !decorativeState.shouldAnimateTimeline)) { context in
+            let phase = decorativeState.shouldAnimateTimeline ? context.date.timeIntervalSinceReferenceDate : 0
+
             if coordinator.overlayPhase == .recording {
-                recordingPill
+                recordingPill(phase: phase, decorativeIntensity: decorativeState.decorativeIntensity)
+                    .frame(width: pillWidth, height: pillHeight)
+                    .background(Color.clear)
             } else {
                 statusPill
+                    .frame(width: pillWidth, height: pillHeight)
+                    .clipShape(Capsule(style: .continuous))
+                    .background(Color.clear)
             }
         }
-        .frame(width: pillWidth, height: pillHeight)
-        .clipShape(Capsule(style: .continuous))
-        .background(Color.clear)
     }
 
     private var title: String {
@@ -203,13 +235,31 @@ private struct RecordingOverlayView: View {
         }
     }
 
-    private var recordingPill: some View {
-        ZStack {
+    private func recordingPill(phase: TimeInterval, decorativeIntensity: Double) -> some View {
+        let glowOpacity = RecordingOverlayMotion.edgeGlowOpacity(intensity: decorativeIntensity)
+        let glowRadius = 4.5 + (decorativeIntensity * 6.0)
+
+        return ZStack {
             Capsule(style: .continuous)
                 .fill(Color.black.opacity(0.95))
+                .overlay(recordingBackground(phase: phase, decorativeIntensity: decorativeIntensity))
                 .overlay(
                     Capsule(style: .continuous)
                         .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(
+                            Color(red: 0.58, green: 0.93, blue: 0.82).opacity(glowOpacity),
+                            lineWidth: 1.1
+                        )
+                        .blur(radius: glowRadius)
+                )
+                .shadow(
+                    color: Color(red: 0.48, green: 0.88, blue: 0.78).opacity(glowOpacity * 0.65),
+                    radius: glowRadius,
+                    x: 0,
+                    y: 0
                 )
 
             HStack(spacing: 10) {
@@ -234,6 +284,54 @@ private struct RecordingOverlayView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 9)
+        }
+    }
+
+    private func recordingBackground(phase: TimeInterval, decorativeIntensity: Double) -> some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+            let nebulaOpacity = 0.16 + (decorativeIntensity * 0.24)
+
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.11, green: 0.14, blue: 0.18).opacity(0.82),
+                        Color.black.opacity(0.30)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+
+                RadialGradient(
+                    colors: [
+                        Color(red: 0.60, green: 0.92, blue: 0.83).opacity(nebulaOpacity),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 4,
+                    endRadius: 64
+                )
+
+                ForEach(Array(RecordingOverlayMotion.ambientStars.enumerated()), id: \.offset) { item in
+                    let index = item.offset
+                    let star = item.element
+                    let offset = reduceMotion
+                        ? .zero
+                        : RecordingOverlayMotion.starOffset(index: index, phase: phase, intensity: decorativeIntensity)
+                    let twinkle = (sin((phase * 1.45) + (star.seed * 2.2)) + 1) * 0.5
+                    let starOpacity = min(0.78, 0.20 + (decorativeIntensity * 0.22) + (twinkle * 0.22))
+
+                    Circle()
+                        .fill(Color.white.opacity(starOpacity))
+                        .frame(width: star.size, height: star.size)
+                        .position(
+                            x: (star.x * size.width) + offset.width,
+                            y: (star.y * size.height) + offset.height
+                        )
+                }
+            }
+            .clipShape(Capsule(style: .continuous))
+            .allowsHitTesting(false)
         }
     }
 
