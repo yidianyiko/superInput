@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import SpeechBarApp
@@ -75,6 +76,64 @@ struct StatusBarControllerTests {
         #expect(factoryCallCount == 1)
         #expect(homeWindow.showCallCount == 2)
     }
+
+    @Test
+    @MainActor
+    func popoverUsesDarkAppearanceForGreenTheme() {
+        let dependencies = makeStatusBarDependencies()
+        dependencies.defaults.set(
+            HomeWindowStore.ThemePreset.green.rawValue,
+            forKey: "home.selectedTheme"
+        )
+
+        let controller = StatusBarController(
+            coordinator: dependencies.coordinator,
+            agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
+            embeddedDisplayCoordinator: dependencies.embeddedDisplayCoordinator,
+            diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
+            pushToTalkSource: dependencies.pushToTalkSource,
+            userProfileStore: dependencies.userProfileStore,
+            audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            modelSettingsStore: dependencies.modelSettingsStore,
+            polishPlaygroundStore: dependencies.polishPlaygroundStore,
+            localWhisperModelStore: dependencies.localWhisperModelStore,
+            senseVoiceModelStore: dependencies.senseVoiceModelStore,
+            memoryConstellationStore: dependencies.memoryConstellationStore,
+            memoryFeatureFlagStore: dependencies.memoryFeatureFlagStore,
+            themeDefaults: dependencies.defaults
+        )
+
+        #expect(controller.popoverAppearanceNameForTesting == .darkAqua)
+    }
+
+    @Test
+    @MainActor
+    func popoverUsesLightAppearanceForAppleTheme() {
+        let dependencies = makeStatusBarDependencies()
+        dependencies.defaults.set(
+            HomeWindowStore.ThemePreset.apple.rawValue,
+            forKey: "home.selectedTheme"
+        )
+
+        let controller = StatusBarController(
+            coordinator: dependencies.coordinator,
+            agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
+            embeddedDisplayCoordinator: dependencies.embeddedDisplayCoordinator,
+            diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
+            pushToTalkSource: dependencies.pushToTalkSource,
+            userProfileStore: dependencies.userProfileStore,
+            audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            modelSettingsStore: dependencies.modelSettingsStore,
+            polishPlaygroundStore: dependencies.polishPlaygroundStore,
+            localWhisperModelStore: dependencies.localWhisperModelStore,
+            senseVoiceModelStore: dependencies.senseVoiceModelStore,
+            memoryConstellationStore: dependencies.memoryConstellationStore,
+            memoryFeatureFlagStore: dependencies.memoryFeatureFlagStore,
+            themeDefaults: dependencies.defaults
+        )
+
+        #expect(controller.popoverAppearanceNameForTesting == .aqua)
+    }
 }
 
 @MainActor
@@ -130,6 +189,7 @@ private func makeStatusBarDependencies() -> StatusBarTestDependencies {
         featureFlags: memoryFeatureFlagStore
     )
     return StatusBarTestDependencies(
+        defaults: defaults,
         coordinator: coordinator,
         agentMonitorCoordinator: agentMonitorCoordinator,
         embeddedDisplayCoordinator: embeddedDisplayCoordinator,
@@ -148,6 +208,7 @@ private func makeStatusBarDependencies() -> StatusBarTestDependencies {
 
 @MainActor
 private struct StatusBarTestDependencies {
+    let defaults: UserDefaults
     let coordinator: VoiceSessionCoordinator
     let agentMonitorCoordinator: AgentMonitorCoordinator
     let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MemoryConstellationHeaderView: View {
+    @Environment(\.memoryConstellationTheme) private var constellationTheme
+
     let snapshot: MemoryConstellationSnapshot
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
     let refreshPresentation: () -> Void
@@ -13,15 +15,15 @@ struct MemoryConstellationHeaderView: View {
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .tracking(1.6)
                         .textCase(.uppercase)
-                        .foregroundStyle(MemoryConstellationTheme.secondaryText.opacity(0.9))
+                        .foregroundStyle(constellationTheme.secondaryText.opacity(0.9))
 
                     Text(snapshot.title)
                         .font(.system(size: 34, weight: .semibold, design: .serif))
-                        .foregroundStyle(MemoryConstellationTheme.primaryText)
+                        .foregroundStyle(constellationTheme.primaryText)
 
                     Text(snapshot.subtitle)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                        .foregroundStyle(constellationTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(spacing: 8) {
@@ -42,7 +44,7 @@ struct MemoryConstellationHeaderView: View {
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
-                    .tint(MemoryConstellationTheme.focusGold)
+                    .tint(constellationTheme.focusAccent)
                     .onChange(of: memoryFeatureFlagStore.displayMode) { _ in
                         refreshPresentation()
                     }
@@ -65,16 +67,16 @@ struct MemoryConstellationHeaderView: View {
     private func statusPill(title: String) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .bold, design: .rounded))
-            .foregroundStyle(MemoryConstellationTheme.primaryText)
+            .foregroundStyle(constellationTheme.primaryText)
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
             .background(
                 Capsule(style: .continuous)
-                    .fill(MemoryConstellationTheme.elevatedFill)
+                    .fill(constellationTheme.elevatedFill)
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                    .stroke(constellationTheme.surfaceStroke, lineWidth: 1)
             )
     }
 }

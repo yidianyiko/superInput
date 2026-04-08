@@ -17,6 +17,7 @@ final class StatusBarController: NSObject {
     private let statusItem: NSStatusItem
     private let popover: NSPopover
     private let menu: NSMenu
+    private let themeDefaults: UserDefaults
     private let homeWindowControllerFactory: () -> any HomeWindowControlling
     private var homeWindowController: (any HomeWindowControlling)?
     private var sessionStateObservation: AnyCancellable?
@@ -35,11 +36,13 @@ final class StatusBarController: NSObject {
         senseVoiceModelStore: SenseVoiceModelStore,
         memoryConstellationStore: MemoryConstellationStore,
         memoryFeatureFlagStore: MemoryFeatureFlagStore,
+        themeDefaults: UserDefaults = .standard,
         homeWindowControllerFactory: (() -> any HomeWindowControlling)? = nil
     ) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.popover = NSPopover()
         self.menu = NSMenu()
+        self.themeDefaults = themeDefaults
         self.homeWindowControllerFactory = homeWindowControllerFactory ?? {
             HomeWindowController(
                 coordinator: coordinator,
@@ -100,7 +103,7 @@ final class StatusBarController: NSObject {
         popover.behavior = .transient
         popover.animates = true
         popover.contentSize = NSSize(width: 432, height: 560)
-        popover.contentViewController = NSHostingController(
+        let hostingController = NSHostingController(
             rootView: StatusPanelView(
                 coordinator: coordinator,
                 agentMonitorCoordinator: agentMonitorCoordinator,
@@ -118,6 +121,27 @@ final class StatusBarController: NSObject {
             )
             .frame(width: 432, height: 560)
         )
+        popover.contentViewController = hostingController
+        updatePopoverAppearance()
+    }
+
+    var popoverAppearanceNameForTesting: NSAppearance.Name? {
+        popover.contentViewController?.view.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
+    }
+
+    private func updatePopoverAppearance() {
+        let appearanceName: NSAppearance.Name = currentThemePreset().palette.isDark ? .darkAqua : .aqua
+        popover.contentViewController?.view.appearance = NSAppearance(named: appearanceName)
+    }
+
+    private func currentThemePreset() -> HomeWindowStore.ThemePreset {
+        guard
+            let rawValue = themeDefaults.string(forKey: "home.selectedTheme"),
+            let preset = HomeWindowStore.ThemePreset(rawValue: rawValue)
+        else {
+            return .green
+        }
+        return preset
     }
 
     private func configureMenu() {
@@ -210,6 +234,7 @@ final class StatusBarController: NSObject {
         if popover.isShown {
             popover.performClose(nil)
         } else {
+            updatePopoverAppearance()
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: false)
         }

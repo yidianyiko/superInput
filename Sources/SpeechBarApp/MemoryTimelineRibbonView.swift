@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MemoryTimelineRibbonView: View {
+    @Environment(\.memoryConstellationTheme) private var constellationTheme
+
     let timeline: MemoryConstellationTimeline
     let selectedViewMode: MemoryConstellationViewMode
     let selectedTimelineWindowID: String?
@@ -16,11 +18,11 @@ struct MemoryTimelineRibbonView: View {
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .tracking(1.2)
                             .textCase(.uppercase)
-                            .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                            .foregroundStyle(constellationTheme.secondaryText)
 
                         Text("回放星团如何变密，以及连接如何随时间浮现。")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                            .foregroundStyle(constellationTheme.secondaryText)
                     }
 
                     Spacer()
@@ -40,7 +42,7 @@ struct MemoryTimelineRibbonView: View {
                 if timeline.windows.isEmpty {
                     Text("当前记忆历史还不够，暂时无法展示有意义的形成回放。")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                        .foregroundStyle(constellationTheme.secondaryText)
                 } else {
                     HStack(spacing: 10) {
                         ForEach(timeline.windows) { window in
@@ -56,7 +58,7 @@ struct MemoryTimelineRibbonView: View {
                                     Text("\(window.memoryCount) 条记忆")
                                         .font(.system(size: 11, weight: .medium))
                                 }
-                                .foregroundStyle(MemoryConstellationTheme.primaryText)
+                                .foregroundStyle(constellationTheme.primaryText)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 12)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,13 +81,13 @@ struct MemoryTimelineRibbonView: View {
 
     private func backgroundFill(for window: MemoryConstellationTimelineWindow) -> Color {
         window.id == selectedTimelineWindowID && selectedViewMode == .timelineReplay
-            ? MemoryConstellationTheme.accentGold.opacity(0.22)
-            : Color.white.opacity(0.05)
+            ? constellationTheme.focusAccent.opacity(0.18)
+            : constellationTheme.secondarySurfaceFill
     }
 
     private func borderColor(for window: MemoryConstellationTimelineWindow) -> Color {
         window.id == selectedTimelineWindowID && selectedViewMode == .timelineReplay
-            ? MemoryConstellationTheme.focusGold.opacity(0.70)
-            : Color.white.opacity(0.08)
+            ? constellationTheme.focusStroke.opacity(0.70)
+            : constellationTheme.secondarySurfaceStroke
     }
 }

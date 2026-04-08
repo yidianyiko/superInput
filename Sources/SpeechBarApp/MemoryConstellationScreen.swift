@@ -6,7 +6,12 @@ struct MemoryConstellationScreen: View {
     @ObservedObject var constellationStore: MemoryConstellationStore
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
+    let palette: HomeWindowStore.HomeThemePalette
     let completedTranscript: PublishedTranscript?
+
+    private var constellationTheme: MemoryConstellationVisualTheme {
+        MemoryConstellationVisualTheme(palette: palette)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -30,7 +35,14 @@ struct MemoryConstellationScreen: View {
                 selectedViewMode: constellationStore.selectedViewMode,
                 capturePulseToken: constellationStore.capturePulseToken,
                 hoverCluster: constellationStore.hoverCluster,
-                focusBridge: constellationStore.focusBridge
+                focusBridge: constellationStore.focusBridge,
+                focusStar: constellationStore.focusStar
+            )
+
+            MemoryConstellationDetailPanelView(
+                memory: constellationStore.selectedMemory,
+                displayMode: memoryFeatureFlagStore.displayMode,
+                hasVisibleMemories: constellationStore.snapshot.clusters.isEmpty == false
             )
 
             MemoryConstellationRelationshipTrayView(
@@ -56,11 +68,12 @@ struct MemoryConstellationScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                .stroke(constellationTheme.screenBorder, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.18), radius: 28, x: 0, y: 16)
         .padding(2)
-        .environment(\.colorScheme, .dark)
+        .environment(\.memoryConstellationTheme, constellationTheme)
+        .environment(\.colorScheme, palette.preferredColorScheme)
         .task {
             await constellationStore.reload()
         }
@@ -80,11 +93,11 @@ struct MemoryConstellationScreen: View {
     private var screenBackground: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 34, style: .continuous)
-                .fill(MemoryConstellationTheme.canvasBackground)
+                .fill(constellationTheme.canvasBackground)
 
             RadialGradient(
                 colors: [
-                    MemoryConstellationTheme.clusterColor(for: .vocabulary).opacity(0.16),
+                    constellationTheme.clusterColor(for: .vocabulary).opacity(0.18),
                     Color.clear
                 ],
                 center: .topLeading,
@@ -94,7 +107,7 @@ struct MemoryConstellationScreen: View {
 
             RadialGradient(
                 colors: [
-                    MemoryConstellationTheme.clusterColor(for: .style).opacity(0.14),
+                    constellationTheme.clusterColor(for: .style).opacity(0.12),
                     Color.clear
                 ],
                 center: .bottomTrailing,

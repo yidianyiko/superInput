@@ -34,6 +34,7 @@ struct MemoryConstellationScreenSmokeTests {
             constellationStore: constellationStore,
             userProfileStore: userProfileStore,
             memoryFeatureFlagStore: featureFlags,
+            palette: HomeWindowStore.ThemePreset.green.palette,
             completedTranscript: nil
         )
         let hostingView = NSHostingView(rootView: rootView.frame(width: 980, height: 860))

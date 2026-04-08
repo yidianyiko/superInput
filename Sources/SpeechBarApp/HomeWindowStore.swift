@@ -99,7 +99,7 @@ final class HomeWindowStore: ObservableObject {
             switch self {
             case .green:
                 return HomeThemePalette(
-                    accent: Color(red: 0.00, green: 0.97, blue: 0.64),
+                    accent: Color(red: 0.00, green: 247.0 / 255.0, blue: 162.0 / 255.0),
                     accentSecondary: Color(red: 0.00, green: 0.84, blue: 0.56),
                     highlight: Color(red: 0.00, green: 0.91, blue: 0.60),
                     sidebarTop: Color.black,

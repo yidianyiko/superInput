@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MemoryConstellationRelationshipTrayView: View {
+    @Environment(\.memoryConstellationTheme) private var constellationTheme
+
     let cards: [MemoryConstellationRelationshipCard]
     let focusBridge: (UUID?) -> Void
 
@@ -11,12 +13,12 @@ struct MemoryConstellationRelationshipTrayView: View {
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .tracking(1.2)
                     .textCase(.uppercase)
-                    .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                    .foregroundStyle(constellationTheme.secondaryText)
 
                 if cards.isEmpty {
                     Text("当前还没有哪条关系特别突出，等更强的模式形成后这里会更清晰。")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                        .foregroundStyle(constellationTheme.secondaryText)
                 } else {
                     HStack(alignment: .top, spacing: 12) {
                         ForEach(cards.prefix(3)) { card in
@@ -26,11 +28,11 @@ struct MemoryConstellationRelationshipTrayView: View {
                                 VStack(alignment: .leading, spacing: 10) {
                                     Text(card.title)
                                         .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(MemoryConstellationTheme.primaryText)
+                                        .foregroundStyle(constellationTheme.primaryText)
 
                                     Text(card.body)
                                         .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                                        .foregroundStyle(constellationTheme.secondaryText)
                                         .multilineTextAlignment(.leading)
                                         .fixedSize(horizontal: false, vertical: true)
 
@@ -38,17 +40,17 @@ struct MemoryConstellationRelationshipTrayView: View {
 
                                     Text(card.bridgeID == nil ? "返回总览" : "聚焦连接")
                                         .font(.system(size: 11, weight: .bold, design: .rounded))
-                                        .foregroundStyle(MemoryConstellationTheme.focusGold)
+                                        .foregroundStyle(constellationTheme.focusAccent)
                                 }
                                 .frame(maxWidth: .infinity, minHeight: 150, alignment: .topLeading)
                                 .padding(16)
                                 .background(
                                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                        .fill(Color.white.opacity(0.05))
+                                        .fill(constellationTheme.secondarySurfaceFill)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                        .stroke(constellationTheme.secondarySurfaceStroke, lineWidth: 1)
                                 )
                             }
                             .buttonStyle(.plain)

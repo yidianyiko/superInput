@@ -2,6 +2,8 @@ import SpeechBarDomain
 import SwiftUI
 
 struct MemoryProfileSettingsSection: View {
+    @Environment(\.memoryConstellationTheme) private var constellationTheme
+
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
 
@@ -25,10 +27,10 @@ struct MemoryProfileSettingsSection: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("辅助记忆控制")
                         .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MemoryConstellationTheme.primaryText)
+                        .foregroundStyle(constellationTheme.primaryText)
                     Text("把手动背景、记忆召回和术语词表放在这里，方便调整，同时不打断星图阅读。")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                        .foregroundStyle(constellationTheme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -36,18 +38,18 @@ struct MemoryProfileSettingsSection: View {
 
                 Text(isExpanded ? "收起" : "展开")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(MemoryConstellationTheme.focusGold)
+                    .foregroundStyle(constellationTheme.focusAccent)
             }
         }
-        .tint(MemoryConstellationTheme.focusGold)
+        .tint(constellationTheme.focusAccent)
         .padding(1)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.white.opacity(0.04))
+                .fill(constellationTheme.secondarySurfaceFill.opacity(0.88))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(constellationTheme.secondarySurfaceStroke, lineWidth: 1)
         )
         .padding(18)
     }
@@ -87,7 +89,7 @@ struct MemoryProfileSettingsSection: View {
                 }
             }
             .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(constellationTheme.secondaryText)
         }
     }
 
@@ -99,11 +101,11 @@ struct MemoryProfileSettingsSection: View {
                 .frame(minHeight: 180)
                 .background(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(constellationTheme.secondarySurfaceFill)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(constellationTheme.secondarySurfaceStroke, lineWidth: 1)
                 )
 
             HStack(spacing: 8) {
@@ -154,7 +156,7 @@ struct MemoryProfileSettingsSection: View {
             } else {
                 Text("关闭后将直接使用原始转写结果；重新开启时会恢复你上次使用的润色模式。")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(constellationTheme.secondaryText)
             }
         }
     }
@@ -166,7 +168,7 @@ struct MemoryProfileSettingsSection: View {
 
             Text("记忆仅保存在本机，敏感输入会被排除或脱敏处理。")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(constellationTheme.secondaryText)
         }
     }
 
@@ -184,7 +186,7 @@ struct MemoryProfileSettingsSection: View {
             if userProfileStore.terminologyGlossary.isEmpty {
                 Text("还没有术语词表。先填写职业并生成术语，或手动添加词条。")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(constellationTheme.secondaryText)
             } else {
                 VStack(spacing: 10) {
                     ForEach(userProfileStore.terminologyGlossary) { entry in
@@ -213,7 +215,7 @@ struct MemoryProfileSettingsSection: View {
                                 Image(systemName: "trash")
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(constellationTheme.secondaryText)
                         }
                     }
                 }
@@ -237,9 +239,10 @@ struct MemoryProfileSettingsSection: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(constellationTheme.primaryText)
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(constellationTheme.secondaryText)
             }
 
             content()
@@ -247,11 +250,11 @@ struct MemoryProfileSettingsSection: View {
         .padding(18)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.white.opacity(0.06))
+                .fill(constellationTheme.surfaceFill)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(constellationTheme.surfaceStroke, lineWidth: 1)
         )
     }
 

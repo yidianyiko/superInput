@@ -225,6 +225,7 @@ struct HomeWindowView: View {
                 constellationStore: memoryConstellationStore,
                 userProfileStore: userProfileStore,
                 memoryFeatureFlagStore: memoryFeatureFlagStore,
+                palette: store.palette,
                 completedTranscript: coordinator.lastCompletedTranscript
             )
         case .model:

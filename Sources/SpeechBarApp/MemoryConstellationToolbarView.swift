@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MemoryConstellationToolbarView: View {
+    @Environment(\.memoryConstellationTheme) private var constellationTheme
+
     let selectedFilter: MemoryConstellationClusterFilter
     let selectedViewMode: MemoryConstellationViewMode
     let selectFilter: (MemoryConstellationClusterFilter) -> Void
@@ -50,11 +52,11 @@ struct MemoryConstellationToolbarView: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .tracking(1.2)
                 .textCase(.uppercase)
-                .foregroundStyle(MemoryConstellationTheme.secondaryText)
+                .foregroundStyle(constellationTheme.secondaryText)
 
             Text(subtitle)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(MemoryConstellationTheme.secondaryText.opacity(0.88))
+                .foregroundStyle(constellationTheme.secondaryText.opacity(0.88))
 
             HStack(spacing: 8) {
                 content()

@@ -167,8 +167,10 @@ struct MemoryConstellationBuilder {
             isDimmed = false
         case .cluster(let selected):
             isDimmed = selected != kind
-        case .bridge, .star:
+        case .bridge:
             isDimmed = false
+        case .star(let selectedID):
+            isDimmed = !items.contains(where: { $0.id == selectedID })
         }
 
         return MemoryConstellationCluster(

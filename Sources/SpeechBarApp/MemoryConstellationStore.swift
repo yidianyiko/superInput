@@ -7,6 +7,7 @@ import SpeechBarDomain
 final class MemoryConstellationStore: ObservableObject {
     @Published private(set) var snapshot: MemoryConstellationSnapshot = .hidden
     @Published private(set) var focus: MemoryConstellationFocus = .overview
+    @Published private(set) var selectedMemory: MemoryItem? = nil
     @Published private(set) var selectedTimelineWindowID: String? = nil
     @Published private(set) var selectedFilter: MemoryConstellationClusterFilter = .all
     @Published private(set) var selectedViewMode: MemoryConstellationViewMode = .clusterMap
@@ -16,8 +17,6 @@ final class MemoryConstellationStore: ObservableObject {
     private let featureFlags: MemoryFeatureFlagStore
     private let builder: MemoryConstellationBuilder
     private var memories: [MemoryItem] = []
-    private let demoPresentationMemoryCount = 30
-    private let minimumLiveMemoryCountForRealOnlyPresentation = 5
     private var lastPulsedTranscriptAt: Date?
 
     init(
@@ -37,7 +36,8 @@ final class MemoryConstellationStore: ObservableObject {
         } catch {
             liveMemories = []
         }
-        memories = presentationMemories(from: liveMemories)
+        memories = liveMemories
+        reconcileSelection()
         rebuildSnapshot()
     }
 
@@ -47,11 +47,13 @@ final class MemoryConstellationStore: ObservableObject {
         } else {
             focus = .overview
         }
+        selectedMemory = nil
         rebuildSnapshot()
     }
 
     func selectFilter(_ filter: MemoryConstellationClusterFilter) {
         selectedFilter = filter
+        reconcileSelection()
         rebuildSnapshot()
     }
 
@@ -60,6 +62,18 @@ final class MemoryConstellationStore: ObservableObject {
             focus = .bridge(bridgeID)
         } else {
             focus = .overview
+        }
+        selectedMemory = nil
+        rebuildSnapshot()
+    }
+
+    func focusStar(_ memoryID: UUID?) {
+        if let memoryID, let memory = filteredActiveMemories().first(where: { $0.id == memoryID }) {
+            focus = .star(memoryID)
+            selectedMemory = memory
+        } else {
+            focus = .overview
+            selectedMemory = nil
         }
         rebuildSnapshot()
     }
@@ -100,70 +114,6 @@ final class MemoryConstellationStore: ObservableObject {
         )
     }
 
-    private func presentationMemories(from liveMemories: [MemoryItem]) -> [MemoryItem] {
-        guard liveMemories.count < minimumLiveMemoryCountForRealOnlyPresentation else {
-            return liveMemories
-        }
-
-        let now = builder.now()
-        guard !liveMemories.isEmpty else {
-            return Array(MemoryConstellationFixtures.defaultMemories(now: now).prefix(demoPresentationMemoryCount))
-        }
-
-        let neededSupplementCount = max(demoPresentationMemoryCount - liveMemories.count, 0)
-        let representedKinds = Set(liveMemories.map(clusterKind(for:)))
-        let seenIdentityHashes = Set(liveMemories.map(\.identityHash))
-
-        let demoCandidates = uniqueDemoCandidates(now: now, excluding: seenIdentityHashes)
-        let supplementalDemoMemories = prioritizedDemoCandidates(
-            from: demoCandidates,
-            representedKinds: representedKinds
-        )
-        .prefix(neededSupplementCount)
-        .map { softenedDemoMemory($0, now: now) }
-
-        return liveMemories + supplementalDemoMemories
-    }
-
-    private func uniqueDemoCandidates(now: Date, excluding identityHashes: Set<String>) -> [MemoryItem] {
-        var seen = identityHashes
-        let candidates = MemoryConstellationFixtures.defaultMemories(now: now)
-            + MemoryConstellationFixtures.dominantMemories(now: now)
-
-        return candidates.filter { seen.insert($0.identityHash).inserted }
-    }
-
-    private func prioritizedDemoCandidates(
-        from candidates: [MemoryItem],
-        representedKinds: Set<MemoryConstellationClusterKind>
-    ) -> [MemoryItem] {
-        let missingKinds = MemoryConstellationClusterKind.allCases.filter { !representedKinds.contains($0) }
-        let preferred = candidates.filter { missingKinds.contains(clusterKind(for: $0)) }
-        let remaining = candidates.filter { !missingKinds.contains(clusterKind(for: $0)) }
-        return preferred + remaining
-    }
-
-    private func softenedDemoMemory(_ memory: MemoryItem, now: Date) -> MemoryItem {
-        let softenedUpdatedAt = min(memory.updatedAt, now.addingTimeInterval(-48 * 60 * 60))
-        let softenedCreatedAt = min(memory.createdAt, softenedUpdatedAt.addingTimeInterval(-10))
-
-        return MemoryItem(
-            id: memory.id,
-            type: memory.type,
-            key: memory.key,
-            valuePayload: memory.valuePayload,
-            valueFingerprint: memory.valueFingerprint,
-            identityHash: memory.identityHash,
-            scope: memory.scope,
-            confidence: min(memory.confidence, 0.58),
-            status: memory.status,
-            createdAt: softenedCreatedAt,
-            updatedAt: softenedUpdatedAt,
-            lastConfirmedAt: softenedUpdatedAt,
-            sourceEventIDs: memory.sourceEventIDs
-        )
-    }
-
     private func clusterKind(for memory: MemoryItem) -> MemoryConstellationClusterKind {
         switch memory.type {
         case .vocabulary, .correction:
@@ -173,5 +123,39 @@ final class MemoryConstellationStore: ObservableObject {
         case .scene:
             return .scenes
         }
+    }
+
+    private func filteredActiveMemories() -> [MemoryItem] {
+        memories.filter { memory in
+            memory.status == .active && includes(memory, in: selectedFilter)
+        }
+    }
+
+    private func includes(_ memory: MemoryItem, in filter: MemoryConstellationClusterFilter) -> Bool {
+        switch filter {
+        case .all:
+            return true
+        case .vocabulary:
+            return clusterKind(for: memory) == .vocabulary
+        case .style:
+            return clusterKind(for: memory) == .style
+        case .scenes:
+            return clusterKind(for: memory) == .scenes
+        }
+    }
+
+    private func reconcileSelection() {
+        guard case .star(let memoryID) = focus else {
+            selectedMemory = nil
+            return
+        }
+
+        guard let memory = filteredActiveMemories().first(where: { $0.id == memoryID }) else {
+            focus = .overview
+            selectedMemory = nil
+            return
+        }
+
+        selectedMemory = memory
     }
 }

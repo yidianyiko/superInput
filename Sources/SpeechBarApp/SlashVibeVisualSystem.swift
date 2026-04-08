@@ -5,19 +5,56 @@ struct SlashVibeCanvas: View {
 
     var body: some View {
         ZStack {
-            palette.canvasTop
+            LinearGradient(
+                colors: palette.isDark
+                    ? [
+                        palette.canvasTop,
+                        palette.canvasBottom
+                    ]
+                    : [
+                        palette.canvasTop,
+                        palette.canvasBottom
+                    ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
                 .ignoresSafeArea()
 
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.88),
-                    Color.white.opacity(0.30),
-                    Color.clear
-                ],
-                startPoint: .top,
-                endPoint: .center
-            )
-            .ignoresSafeArea()
+            if palette.isDark {
+                RadialGradient(
+                    colors: [
+                        palette.accent.opacity(0.16),
+                        palette.accent.opacity(0.05),
+                        .clear
+                    ],
+                    center: .topTrailing,
+                    startRadius: 0,
+                    endRadius: 340
+                )
+                .ignoresSafeArea()
+
+                RadialGradient(
+                    colors: [
+                        palette.highlight.opacity(0.08),
+                        .clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 0,
+                    endRadius: 280
+                )
+                .ignoresSafeArea()
+            } else {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.88),
+                        Color.white.opacity(0.30),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .center
+                )
+                .ignoresSafeArea()
+            }
 
             RadialGradient(
                 colors: [
@@ -57,7 +94,7 @@ private struct SlashVibeSurfaceModifier: ViewModifier {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.86), lineWidth: 1)
+                            .stroke(palette.isDark ? palette.controlStroke : Color.white.opacity(0.86), lineWidth: 1)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -85,7 +122,12 @@ private struct SlashVibeHeroSurfaceModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(
                         LinearGradient(
-                            colors: [
+                            colors: palette.isDark
+                            ? [
+                                palette.cardTop,
+                                palette.cardBottom
+                            ]
+                            : [
                                 Color.white,
                                 Color(red: 0.975, green: 0.978, blue: 0.985)
                             ],
@@ -96,8 +138,8 @@ private struct SlashVibeHeroSurfaceModifier: ViewModifier {
                     .overlay(
                         RadialGradient(
                             colors: [
-                                palette.accent.opacity(0.08),
-                                Color.white.opacity(0.30),
+                                palette.accent.opacity(palette.isDark ? 0.20 : 0.08),
+                                palette.isDark ? Color.black.opacity(0.18) : Color.white.opacity(0.30),
                                 .clear
                             ],
                             center: .topTrailing,
@@ -107,15 +149,15 @@ private struct SlashVibeHeroSurfaceModifier: ViewModifier {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.white.opacity(0.92), lineWidth: 1)
+                            .stroke(palette.isDark ? palette.controlStroke : Color.white.opacity(0.92), lineWidth: 1)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            .stroke(palette.isDark ? palette.border.opacity(0.65) : Color.black.opacity(0.08), lineWidth: 1)
                             .padding(0.5)
                     )
-                    .shadow(color: Color.black.opacity(0.09), radius: 24, x: 0, y: 16)
-                    .shadow(color: Color.black.opacity(0.03), radius: 2, x: 0, y: 1)
+                    .shadow(color: Color.black.opacity(palette.isDark ? 0.35 : 0.09), radius: 24, x: 0, y: 16)
+                    .shadow(color: Color.black.opacity(palette.isDark ? 0.16 : 0.03), radius: 2, x: 0, y: 1)
             )
     }
 }
@@ -149,17 +191,19 @@ extension View {
 }
 
 struct SlashVibeHeroSecondaryButtonStyle: ButtonStyle {
+    let palette: HomeWindowStore.HomeThemePalette
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 13, weight: .semibold))
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(palette.controlFill, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.black.opacity(0.10), lineWidth: 1)
+                    .stroke(palette.controlStroke, lineWidth: 1)
             )
-            .foregroundStyle(Color(red: 0.11, green: 0.11, blue: 0.12))
+            .foregroundStyle(palette.controlText)
             .opacity(configuration.isPressed ? 0.82 : 1.0)
     }
 }
