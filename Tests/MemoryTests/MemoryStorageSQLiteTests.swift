@@ -120,6 +120,59 @@ struct MemoryStorageSQLiteTests {
         ) })
     }
 
+    @Test
+    func catalogQueryFiltersByStatusAndType() async throws {
+        let store = try makeTestStore()
+
+        try await store.upsert(memory: MemoryItem(
+            id: UUID(),
+            type: .vocabulary,
+            key: "term:openai",
+            valuePayload: Data("OpenAI".utf8),
+            valueFingerprint: "OpenAI",
+            identityHash: "active-vocabulary",
+            scope: .app("com.apple.mail"),
+            confidence: 0.80,
+            status: .active,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0),
+            lastConfirmedAt: Date(timeIntervalSince1970: 0),
+            sourceEventIDs: []
+        ))
+
+        try await store.upsert(memory: MemoryItem(
+            id: UUID(),
+            type: .scene,
+            key: "scene:mail:body",
+            valuePayload: Data("AXTextArea".utf8),
+            valueFingerprint: "AXTextArea",
+            identityHash: "deleted-scene",
+            scope: .field(
+                appIdentifier: "com.apple.mail",
+                windowTitle: "Reply",
+                fieldRole: "AXTextArea",
+                fieldLabel: "Message Body"
+            ),
+            confidence: 0.55,
+            status: .deleted,
+            createdAt: Date(timeIntervalSince1970: 1),
+            updatedAt: Date(timeIntervalSince1970: 1),
+            lastConfirmedAt: nil,
+            sourceEventIDs: []
+        ))
+
+        let rows = try await store.listMemories(
+            matching: MemoryCenterQuery(
+                statuses: [.active],
+                types: [.vocabulary]
+            )
+        )
+
+        #expect(rows.count == 1)
+        #expect(rows[0].type == .vocabulary)
+        #expect(rows[0].valueFingerprint == "OpenAI")
+    }
+
     private func makeTestStore(now: Date = Date(timeIntervalSince1970: 0)) throws -> MemoryStorageSQLiteStore {
         try MemoryStorageSQLiteStore(
             databaseURL: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".sqlite"),

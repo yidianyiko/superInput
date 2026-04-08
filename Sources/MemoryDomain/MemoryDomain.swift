@@ -40,7 +40,7 @@ public enum RecallCapability: String, Sendable, Codable, Equatable {
     case directFill
 }
 
-public enum MemoryType: String, Sendable, Codable, Equatable {
+public enum MemoryType: String, Sendable, Codable, Equatable, CaseIterable {
     case vocabulary
     case correction
     case style
@@ -76,7 +76,7 @@ public enum MemoryScope: Sendable, Codable, Equatable {
     }
 }
 
-public enum MemoryStatus: String, Sendable, Codable, Equatable {
+public enum MemoryStatus: String, Sendable, Codable, Equatable, CaseIterable {
     case active
     case hidden
     case deleted
@@ -332,7 +332,7 @@ public struct SensitiveFieldClassifier: Sendable {
     }
 }
 
-public protocol MemoryStore: Sendable {
+public protocol MemoryStore: Sendable, MemoryCatalogProviding {
     func insert(event: InputEvent) async throws
     func upsert(memory: MemoryItem) async throws
     func listMemories(for request: RecallRequest) async throws -> [MemoryItem]

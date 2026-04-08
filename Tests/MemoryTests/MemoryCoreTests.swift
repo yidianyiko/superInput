@@ -44,6 +44,17 @@ private actor InMemoryMemoryStore: MemoryStore {
         memories
     }
 
+    func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
+        let filtered = memories.filter { memory in
+            query.statuses.contains(memory.status) && query.types.contains(memory.type)
+        }
+
+        if let limit = query.limit {
+            return Array(filtered.prefix(limit))
+        }
+        return filtered
+    }
+
     func markDeleted(identityHash: String, deletedAt: Date) async throws {}
 }
 

@@ -3,6 +3,7 @@ import Foundation
 import SpeechBarApplication
 import SpeechBarDomain
 import SpeechBarInfrastructure
+import MemoryDomain
 import SwiftUI
 
 enum OffscreenHomeSnapshotRuntime {
@@ -13,6 +14,8 @@ struct OffscreenHomeSnapshotCommand: Sendable {
     let outputURL: URL
     let section: SectionOverride?
     let theme: ThemeOverride?
+    let memoryScenario: MemoryScenario
+    let memoryDisplayMode: MemoryConstellationDisplayMode?
     let width: CGFloat
     let height: CGFloat
     let scale: CGFloat
@@ -58,6 +61,8 @@ struct OffscreenHomeSnapshotCommand: Sendable {
             .flatMap { SectionOverride(rawValue: $0.lowercased()) }
         let theme = value(after: "--theme")
             .flatMap { ThemeOverride(rawValue: $0.lowercased()) }
+        let memoryScenario = Self.parseCaseInsensitive(value(after: "--memory-scenario"), as: MemoryScenario.self) ?? .default
+        let memoryDisplayMode = Self.parseCaseInsensitive(value(after: "--memory-display-mode"), as: MemoryConstellationDisplayMode.self)
         let width = value(after: "--width").flatMap(Double.init) ?? 1240
         let height = value(after: "--height").flatMap(Double.init) ?? 780
         let scale = value(after: "--scale").flatMap(Double.init) ?? 2
@@ -66,18 +71,31 @@ struct OffscreenHomeSnapshotCommand: Sendable {
             outputURL: outputURL,
             section: section,
             theme: theme,
+            memoryScenario: memoryScenario,
+            memoryDisplayMode: memoryDisplayMode,
             width: CGFloat(width),
             height: CGFloat(height),
             scale: CGFloat(scale)
         )
     }
+
+    private static func parseCaseInsensitive<T>(_ value: String?, as type: T.Type) -> T?
+    where T: RawRepresentable & CaseIterable, T.RawValue == String {
+        guard let value else {
+            return nil
+        }
+
+        return T.allCases.first {
+            $0.rawValue.compare(value, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame
+        }
+    }
 }
 
 enum OffscreenHomeSnapshotRenderer {
     @MainActor
-    static func run(_ command: OffscreenHomeSnapshotCommand) -> Int32 {
+    static func run(_ command: OffscreenHomeSnapshotCommand) async -> Int32 {
         do {
-            try render(command)
+            try await render(command)
             return 0
         } catch {
             fputs("error: \(error.localizedDescription)\n", stderr)
@@ -86,12 +104,17 @@ enum OffscreenHomeSnapshotRenderer {
     }
 
     @MainActor
-    private static func render(_ command: OffscreenHomeSnapshotCommand) throws {
+    private static func render(_ command: OffscreenHomeSnapshotCommand) async throws {
         let defaultsContext = SnapshotDefaultsContext()
         defer { defaultsContext.cleanup() }
 
-        let environment = SnapshotEnvironment(defaults: defaultsContext.defaults)
-        environment.apply(command: command)
+        let environment = SnapshotEnvironment(defaults: defaultsContext.defaults, command: command)
+
+        if command.section == .memory {
+            await preloadMemoryConstellation(reload: {
+                await environment.memoryConstellationStore.reload()
+            })
+        }
 
         let rootView = HomeWindowView(
             coordinator: environment.coordinator,
@@ -105,6 +128,7 @@ enum OffscreenHomeSnapshotRenderer {
             polishPlaygroundStore: environment.polishPlaygroundStore,
             localWhisperModelStore: environment.localWhisperModelStore,
             senseVoiceModelStore: environment.senseVoiceModelStore,
+            memoryConstellationStore: environment.memoryConstellationStore,
             memoryFeatureFlagStore: environment.memoryFeatureFlagStore,
             pushToTalkSource: environment.pushToTalkSource
         )
@@ -132,6 +156,12 @@ enum OffscreenHomeSnapshotRenderer {
         )
         try data.write(to: outputURL, options: .atomic)
         print(outputURL.path)
+    }
+
+    static func preloadMemoryConstellation(
+        reload: @escaping @Sendable () async -> Void
+    ) async {
+        await reload()
     }
 }
 
@@ -164,11 +194,13 @@ private final class SnapshotEnvironment {
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
     let memoryFeatureFlagStore: MemoryFeatureFlagStore
+    let memoryConstellationStore: MemoryConstellationStore
     let homeStore: HomeWindowStore
 
-    init(defaults: UserDefaults) {
+    init(defaults: UserDefaults, command: OffscreenHomeSnapshotCommand) {
         self.defaults = defaults
         self.pushToTalkSource = OnScreenPushToTalkSource()
+        let snapshotNow = Date(timeIntervalSince1970: 100)
 
         let localWhisperModelStore = LocalWhisperModelStore(defaults: defaults)
         localWhisperModelStore.prepareForLaunch(showFirstInstallPrompt: false)
@@ -217,6 +249,22 @@ private final class SnapshotEnvironment {
         self.userProfileStore = UserProfileStore(defaults: defaults)
         self.audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
         self.memoryFeatureFlagStore = MemoryFeatureFlagStore(defaults: defaults)
+        if let memoryDisplayMode = command.memoryDisplayMode {
+            self.memoryFeatureFlagStore.displayMode = memoryDisplayMode
+        }
+
+        let memoryCatalog: (any MemoryCatalogProviding)?
+        switch command.memoryScenario {
+        case .live:
+            memoryCatalog = nil
+        default:
+            memoryCatalog = MemoryConstellationFixtures.catalogProvider(for: command.memoryScenario, now: snapshotNow)
+        }
+        self.memoryConstellationStore = MemoryConstellationStore(
+            catalog: memoryCatalog,
+            featureFlags: memoryFeatureFlagStore,
+            builder: MemoryConstellationBuilder(now: { snapshotNow })
+        )
         self.diagnosticsCoordinator = DiagnosticsCoordinator(
             baseDirectory: FileManager.default.temporaryDirectory
                 .appendingPathComponent("slashvibe-offscreen-diagnostics", isDirectory: true)
@@ -256,15 +304,13 @@ private final class SnapshotEnvironment {
             coordinator: coordinator,
             defaults: defaults
         )
-    }
 
-    func apply(command: OffscreenHomeSnapshotCommand) {
         if let section = command.section.flatMap(Self.mapSection(from:)) {
-            homeStore.saveSelectedSection(section)
+            self.homeStore.saveSelectedSection(section)
         }
 
         if let theme = command.theme.flatMap(Self.mapTheme(from:)) {
-            homeStore.selectedTheme = theme
+            self.homeStore.selectedTheme = theme
         }
     }
 

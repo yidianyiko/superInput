@@ -11,6 +11,7 @@ final class StatusBarController: NSObject {
     private let popover: NSPopover
     private let menu: NSMenu
     private let homeWindowController: HomeWindowController
+    private let memoryConstellationStore: MemoryConstellationStore
     private var sessionStateObservation: AnyCancellable?
 
     init(
@@ -25,11 +26,13 @@ final class StatusBarController: NSObject {
         polishPlaygroundStore: PolishPlaygroundStore,
         localWhisperModelStore: LocalWhisperModelStore,
         senseVoiceModelStore: SenseVoiceModelStore,
+        memoryConstellationStore: MemoryConstellationStore,
         memoryFeatureFlagStore: MemoryFeatureFlagStore
     ) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.popover = NSPopover()
         self.menu = NSMenu()
+        self.memoryConstellationStore = memoryConstellationStore
         self.homeWindowController = HomeWindowController(
             coordinator: coordinator,
             agentMonitorCoordinator: agentMonitorCoordinator,
@@ -42,6 +45,7 @@ final class StatusBarController: NSObject {
             polishPlaygroundStore: polishPlaygroundStore,
             localWhisperModelStore: localWhisperModelStore,
             senseVoiceModelStore: senseVoiceModelStore,
+            memoryConstellationStore: memoryConstellationStore,
             memoryFeatureFlagStore: memoryFeatureFlagStore
         )
         super.init()

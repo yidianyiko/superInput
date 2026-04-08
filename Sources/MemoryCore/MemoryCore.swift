@@ -3,7 +3,7 @@ import MemoryDomain
 import MemoryExtraction
 import MemoryStorageSQLite
 
-public actor MemoryCoordinator: MemoryRetriever, MemoryEventRecording {
+public actor MemoryCoordinator: MemoryRetriever, MemoryEventRecording, MemoryCatalogProviding {
     private let store: any MemoryStore
     private let extractor: any MemoryExtractor
 
@@ -35,6 +35,10 @@ public actor MemoryCoordinator: MemoryRetriever, MemoryEventRecording {
             sceneHints: values(of: .scene, from: chosenByIdentity, minimumConfidence: 0.60),
             diagnosticSummary: "memory_count=\(ranked.count)"
         )
+    }
+
+    public func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
+        try await store.listMemories(matching: query)
     }
 
     private func compareRank(lhs: MemoryItem, rhs: MemoryItem) -> Bool {

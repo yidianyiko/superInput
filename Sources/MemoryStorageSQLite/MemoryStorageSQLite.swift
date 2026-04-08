@@ -4,6 +4,14 @@ import SQLite3
 
 public actor MemoryStorageSQLiteStore: MemoryStore {
     private static let retentionInterval: TimeInterval = 30 * 24 * 60 * 60
+    private static let memorySelectSQL = """
+        SELECT identity_hash, id, type, memory_key, value_payload, value_fingerprint,
+               scope_kind, scope_app_identifier, scope_window_title, scope_field_role,
+               scope_field_label, confidence, status, created_at, updated_at,
+               last_confirmed_at, source_event_ids
+        FROM memories
+        ORDER BY updated_at DESC;
+        """
 
     private let databaseURL: URL
     nonisolated(unsafe) private let db: OpaquePointer
@@ -107,51 +115,28 @@ public actor MemoryStorageSQLiteStore: MemoryStore {
         }
     }
 
-    public func listMemories(for request: RecallRequest) async throws -> [MemoryItem] {
-        let sql = """
-        SELECT identity_hash, id, type, memory_key, value_payload, value_fingerprint,
-               scope_kind, scope_app_identifier, scope_window_title, scope_field_role,
-               scope_field_label, confidence, status, created_at, updated_at,
-               last_confirmed_at, source_event_ids
-        FROM memories
-        WHERE status = ?
-        ORDER BY updated_at DESC;
-        """
-
-        return try query(sql) { statement in
-            bindText(MemoryStatus.active.rawValue, to: statement, at: 1)
-        } rowDecoder: { statement in
-            let scope = try decodeScope(from: statement)
-            guard scope.matches(request: request) else {
+    public func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
+        let rows: [MemoryItem] = try self.query(Self.memorySelectSQL, bind: { _ in }) { statement in
+            let memory = try decodeMemory(from: statement)
+            guard query.statuses.contains(memory.status) else {
                 return nil
             }
-
-            let eventIDsBlob = try readBlob(from: statement, at: 16)
-            let eventIDStrings = try JSONDecoder().decode([String].self, from: eventIDsBlob)
-            let sourceEventIDs = try eventIDStrings.map { value in
-                guard let uuid = UUID(uuidString: value) else {
-                    throw SQLiteStoreError.decodeFailed("Invalid UUID \(value)")
-                }
-                return uuid
+            guard query.types.contains(memory.type) else {
+                return nil
             }
+            return memory
+        }
 
-            return MemoryItem(
-                id: try readUUID(from: statement, at: 1),
-                type: try readEnum(MemoryType.self, from: statement, at: 2),
-                key: try readText(from: statement, at: 3),
-                valuePayload: try cipher.decrypt(readBlob(from: statement, at: 4)),
-                valueFingerprint: try readText(from: statement, at: 5),
-                identityHash: try readText(from: statement, at: 0),
-                scope: scope,
-                confidence: sqlite3_column_double(statement, 11),
-                status: try readEnum(MemoryStatus.self, from: statement, at: 12),
-                createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 13)),
-                updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 14)),
-                lastConfirmedAt: sqlite3_column_type(statement, 15) == SQLITE_NULL
-                    ? nil
-                    : Date(timeIntervalSince1970: sqlite3_column_double(statement, 15)),
-                sourceEventIDs: sourceEventIDs
-            )
+        if let limit = query.limit {
+            return Array(rows.prefix(limit))
+        }
+        return rows
+    }
+
+    public func listMemories(for request: RecallRequest) async throws -> [MemoryItem] {
+        let memories = try await listMemories(matching: MemoryCenterQuery())
+        return memories.filter { memory in
+            memory.scope.matches(request: request)
         }
     }
 
@@ -226,6 +211,36 @@ public actor MemoryStorageSQLiteStore: MemoryStore {
             Int(sqlite3_column_int64(statement, 0))
         }
         return rows.first ?? 0
+    }
+
+    private func decodeMemory(from statement: OpaquePointer) throws -> MemoryItem {
+        let scope = try decodeScope(from: statement)
+        let eventIDsBlob = try readBlob(from: statement, at: 16)
+        let eventIDStrings = try JSONDecoder().decode([String].self, from: eventIDsBlob)
+        let sourceEventIDs = try eventIDStrings.map { value in
+            guard let uuid = UUID(uuidString: value) else {
+                throw SQLiteStoreError.decodeFailed("Invalid UUID \(value)")
+            }
+            return uuid
+        }
+
+        return MemoryItem(
+            id: try readUUID(from: statement, at: 1),
+            type: try readEnum(MemoryType.self, from: statement, at: 2),
+            key: try readText(from: statement, at: 3),
+            valuePayload: try cipher.decrypt(readBlob(from: statement, at: 4)),
+            valueFingerprint: try readText(from: statement, at: 5),
+            identityHash: try readText(from: statement, at: 0),
+            scope: scope,
+            confidence: sqlite3_column_double(statement, 11),
+            status: try readEnum(MemoryStatus.self, from: statement, at: 12),
+            createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 13)),
+            updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 14)),
+            lastConfirmedAt: sqlite3_column_type(statement, 15) == SQLITE_NULL
+                ? nil
+                : Date(timeIntervalSince1970: sqlite3_column_double(statement, 15)),
+            sourceEventIDs: sourceEventIDs
+        )
     }
 
     private static func migrate(db: OpaquePointer) throws {
