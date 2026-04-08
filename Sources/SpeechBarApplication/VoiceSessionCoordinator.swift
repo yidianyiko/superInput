@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import MemoryDomain
 import SpeechBarDomain
 
 private func performanceLog(_ message: String) {
@@ -41,10 +42,18 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private let transcriptPublisher: any TranscriptPublisher
     private let windowSwitcher: (any WindowSwitching)?
     private let transcriptTargetCapturer: (any TranscriptTargetCapturing)?
+    private let focusedSnapshotProvider: (any FocusedInputSnapshotProviding)?
     private let userProfileProvider: (any UserProfileContextProviding)?
     private let transcriptPostProcessor: (any TranscriptPostProcessor)?
+    private let memoryRecorder: (any MemoryEventRecording)?
+    private let memoryRetriever: (any MemoryRetriever)?
+    private let diagnostics: DiagnosticsCoordinator?
     private let baseConfiguration: LiveTranscriptionConfiguration
     private let sleepClock: any SleepClock
+    private let memoryCaptureEnabled: @Sendable () async -> Bool
+    private let memoryRecallEnabled: @Sendable () async -> Bool
+    private let memoryOptedOutApps: @Sendable () async -> Set<String>
+    private let memoryOptedOutFieldLabels: @Sendable () async -> Set<String>
 
     private var hardwareTask: Task<Void, Never>?
     private var transcriptionEventTask: Task<Void, Never>?
@@ -59,6 +68,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private var shouldFinalizeWhenReady = false
     private var isCompletingActiveSession = false
     private var finalSegments: [String] = []
+    private var activeRecallBundle: RecallBundle?
 
     public init(
         hardwareSource: any HardwareEventSource,
@@ -68,10 +78,18 @@ public final class VoiceSessionCoordinator: ObservableObject {
         transcriptPublisher: any TranscriptPublisher,
         windowSwitcher: (any WindowSwitching)? = nil,
         transcriptTargetCapturer: (any TranscriptTargetCapturing)? = nil,
+        focusedSnapshotProvider: (any FocusedInputSnapshotProviding)? = nil,
         userProfileProvider: (any UserProfileContextProviding)? = nil,
         transcriptPostProcessor: (any TranscriptPostProcessor)? = nil,
+        memoryRecorder: (any MemoryEventRecording)? = nil,
+        memoryRetriever: (any MemoryRetriever)? = nil,
+        diagnostics: DiagnosticsCoordinator? = nil,
         configuration: LiveTranscriptionConfiguration = LiveTranscriptionConfiguration(),
-        sleepClock: any SleepClock = ContinuousSleepClock()
+        sleepClock: any SleepClock = ContinuousSleepClock(),
+        memoryCaptureEnabled: @escaping @Sendable () async -> Bool = { true },
+        memoryRecallEnabled: @escaping @Sendable () async -> Bool = { false },
+        memoryOptedOutApps: @escaping @Sendable () async -> Set<String> = { [] },
+        memoryOptedOutFieldLabels: @escaping @Sendable () async -> Set<String> = { [] }
     ) {
         self.hardwareSource = hardwareSource
         self.audioInputSource = audioInputSource
@@ -80,10 +98,18 @@ public final class VoiceSessionCoordinator: ObservableObject {
         self.transcriptPublisher = transcriptPublisher
         self.windowSwitcher = windowSwitcher
         self.transcriptTargetCapturer = transcriptTargetCapturer
+        self.focusedSnapshotProvider = focusedSnapshotProvider
         self.userProfileProvider = userProfileProvider
         self.transcriptPostProcessor = transcriptPostProcessor
+        self.memoryRecorder = memoryRecorder
+        self.memoryRetriever = memoryRetriever
+        self.diagnostics = diagnostics
         self.baseConfiguration = configuration
         self.sleepClock = sleepClock
+        self.memoryCaptureEnabled = memoryCaptureEnabled
+        self.memoryRecallEnabled = memoryRecallEnabled
+        self.memoryOptedOutApps = memoryOptedOutApps
+        self.memoryOptedOutFieldLabels = memoryOptedOutFieldLabels
         self.credentialStatus = credentialProvider.credentialStatus()
     }
 
@@ -241,6 +267,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         interimTranscript = ""
         finalTranscript = ""
         lastPolishFallbackReason = nil
+        activeRecallBundle = nil
         statusMessage = "Preparing microphone..."
         isPushToTalkActive = true
         sessionState = .requestingPermission
@@ -272,7 +299,8 @@ public final class VoiceSessionCoordinator: ObservableObject {
         statusMessage = "Connecting to transcription service..."
 
         let context = await currentUserProfileContext()
-        let sessionConfiguration = makeSessionConfiguration(context: context)
+        activeRecallBundle = await currentRecallBundle()
+        let sessionConfiguration = makeSessionConfiguration(context: context, recall: activeRecallBundle)
 
         do {
             try await transcriptionClient.connect(apiKey: apiKey, configuration: sessionConfiguration)
@@ -439,8 +467,9 @@ public final class VoiceSessionCoordinator: ObservableObject {
         }
 
         let context = await currentUserProfileContext()
+        let polishContext = makePolishContext(base: context, recall: activeRecallBundle)
         let polishedTranscript: String
-        if shouldAttemptPolish(transcript: transcript, context: context) {
+        if shouldAttemptPolish(transcript: transcript, context: polishContext) {
             overlayPhase = .polishing
             overlaySubtitle = "Polishing"
             if let activeFinalizeStartedAt {
@@ -448,7 +477,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
                     "transcription finished, rawChars=\(transcript.count), transcriptionLatency=\(String(format: "%.3f", Date().timeIntervalSince(activeFinalizeStartedAt)))s"
                 )
             }
-            polishedTranscript = await polishTranscriptIfNeeded(transcript, context: context)
+            polishedTranscript = await polishTranscriptIfNeeded(transcript, context: polishContext)
         } else {
             if let activeFinalizeStartedAt {
                 performanceLog(
@@ -493,6 +522,13 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 "session finished, endToEndFinalizeLatency=\(String(format: "%.3f", Date().timeIntervalSince(activeFinalizeStartedAt)))s"
             )
         }
+        await recordMemoryEventIfNeeded(
+            transcript: transcript,
+            polishedTranscript: polishedTranscript,
+            completedAt: completedAt,
+            completedDuration: completedDuration,
+            deliveryOutcome: deliveryOutcome
+        )
         await teardownActiveSession()
         sessionState = .idle
         overlayPhase = .hidden
@@ -533,6 +569,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeSessionID = nil
         activeSessionStartedAt = nil
         activeFinalizeStartedAt = nil
+        activeRecallBundle = nil
         audioLevelWindow = []
 
         await audioInputSource.stopCapture()
@@ -572,29 +609,16 @@ public final class VoiceSessionCoordinator: ObservableObject {
         await userProfileProvider?.currentContext() ?? UserProfileContext()
     }
 
-    private func makeSessionConfiguration(context: UserProfileContext) -> LiveTranscriptionConfiguration {
-        guard context.isTerminologyGlossaryEnabled else {
-            return LiveTranscriptionConfiguration(
-                endpoint: baseConfiguration.endpoint,
-                model: baseConfiguration.model,
-                language: baseConfiguration.language,
-                encoding: baseConfiguration.encoding,
-                sampleRate: baseConfiguration.sampleRate,
-                channels: baseConfiguration.channels,
-                interimResults: baseConfiguration.interimResults,
-                punctuate: baseConfiguration.punctuate,
-                smartFormat: baseConfiguration.smartFormat,
-                vadEvents: baseConfiguration.vadEvents,
-                endpointingMilliseconds: baseConfiguration.endpointingMilliseconds,
-                utteranceEndMilliseconds: baseConfiguration.utteranceEndMilliseconds,
-                keywords: []
-            )
-        }
-
+    private func makeSessionConfiguration(
+        context: UserProfileContext,
+        recall: RecallBundle?
+    ) -> LiveTranscriptionConfiguration {
         var seen = Set<String>()
-        let keywords = context.terminologyGlossary
-            .filter(\.isEnabled)
-            .map(\.term)
+        let glossaryKeywords = context.isTerminologyGlossaryEnabled
+            ? context.terminologyGlossary.filter(\.isEnabled).map(\.term)
+            : []
+        let recallKeywords = (recall?.vocabularyHints ?? []) + (recall?.correctionHints ?? [])
+        let keywords = (glossaryKeywords + recallKeywords)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0.lowercased()).inserted }
@@ -614,6 +638,64 @@ public final class VoiceSessionCoordinator: ObservableObject {
             utteranceEndMilliseconds: baseConfiguration.utteranceEndMilliseconds,
             keywords: Array(keywords.prefix(100))
         )
+    }
+
+    private func makePolishContext(
+        base: UserProfileContext,
+        recall: RecallBundle?
+    ) -> UserProfileContext {
+        guard let recall else {
+            return base
+        }
+
+        let additions = (recall.styleHints + recall.sceneHints)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        guard !additions.isEmpty else {
+            return base
+        }
+
+        var updated = base
+        let prefix = updated.memoryProfile.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.memoryProfile = prefix.isEmpty ? additions : "\(prefix)\n\n\(additions)"
+        return updated
+    }
+
+    private func currentRecallBundle() async -> RecallBundle? {
+        guard await memoryRecallEnabled() else {
+            return nil
+        }
+        guard let memoryRetriever,
+              let snapshot = await focusedSnapshotProvider?.currentFocusedInputSnapshot() else {
+            return nil
+        }
+
+        let request = RecallRequest(
+            timestamp: Date(),
+            appIdentifier: snapshot.appIdentifier,
+            windowTitle: snapshot.windowTitle,
+            pageTitle: snapshot.pageTitle,
+            fieldRole: snapshot.fieldRole,
+            fieldLabel: snapshot.fieldLabel,
+            requestedCapabilities: [.transcription, .polish]
+        )
+
+        do {
+            let bundle = try await memoryRetriever.recall(for: request)
+            diagnostics?.recordMemoryEvent(
+                "Loaded recall bundle",
+                metadata: ["summary": bundle.diagnosticSummary]
+            )
+            return bundle
+        } catch {
+            diagnostics?.recordMemoryEvent(
+                "Recall lookup failed",
+                severity: .warning,
+                metadata: ["error": error.localizedDescription]
+            )
+            return nil
+        }
     }
 
     private func polishTranscriptIfNeeded(
@@ -764,6 +846,95 @@ public final class VoiceSessionCoordinator: ObservableObject {
             }) {
                 count += 1
             }
+        }
+    }
+
+    private func recordMemoryEventIfNeeded(
+        transcript: String,
+        polishedTranscript: String,
+        completedAt: Date,
+        completedDuration: TimeInterval?,
+        deliveryOutcome: TranscriptDeliveryOutcome
+    ) async {
+        guard await memoryCaptureEnabled() else {
+            return
+        }
+        guard let memoryRecorder,
+              let snapshot = await focusedSnapshotProvider?.currentFocusedInputSnapshot() else {
+            return
+        }
+
+        let classifier = SensitiveFieldClassifier(
+            optedOutApps: await memoryOptedOutApps(),
+            optedOutFieldLabels: await memoryOptedOutFieldLabels()
+        )
+        let sensitivity = classifier.classify(snapshot)
+        let observedText = sensitivity == .normal || sensitivity == .redacted
+            ? await focusedSnapshotProvider?.observedTextAfterPublish()
+            : nil
+        let trimmedObservedText = observedText?.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let trimmedInsertedText = polishedTranscript.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+        let observationStatus: ObservationStatus
+        if sensitivity == .secureExcluded || sensitivity == .optOut {
+            observationStatus = .blockedSensitive
+        } else if trimmedObservedText == nil {
+            observationStatus = .unavailable
+        } else if trimmedObservedText == trimmedInsertedText {
+            observationStatus = .observedNoChange
+        } else {
+            observationStatus = .observedFinal
+        }
+
+        let event = InputEvent(
+            id: UUID(),
+            timestamp: completedAt,
+            languageCode: primaryLanguageCode(from: baseConfiguration.language),
+            localeIdentifier: Locale.current.identifier,
+            appIdentifier: snapshot.appIdentifier,
+            appName: snapshot.appName,
+            windowTitle: snapshot.windowTitle,
+            pageTitle: snapshot.pageTitle,
+            fieldRole: snapshot.fieldRole,
+            fieldLabel: snapshot.fieldLabel,
+            sensitivityClass: sensitivity,
+            observationStatus: observationStatus,
+            actionType: polishedTranscript == transcript ? .transcribe : .polish,
+            rawTranscript: rawFinalTranscript,
+            polishedText: polishedTranscript == transcript ? nil : polishedTranscript,
+            insertedText: polishedTranscript,
+            finalUserEditedText: observedText,
+            outcome: inputOutcome(for: deliveryOutcome),
+            durationMs: Int((completedDuration ?? 0) * 1000),
+            source: .speech
+        )
+
+        do {
+            try await memoryRecorder.record(event: event)
+            diagnostics?.recordMemoryEvent(
+                "Recorded memory event",
+                metadata: [
+                    "app": snapshot.appIdentifier,
+                    "sensitivity": sensitivity.rawValue,
+                    "observation": observationStatus.rawValue
+                ]
+            )
+        } catch {
+            diagnostics?.recordMemoryEvent(
+                "Memory event recording failed",
+                severity: .warning,
+                metadata: ["error": error.localizedDescription]
+            )
+        }
+    }
+
+    private func primaryLanguageCode(from language: String) -> String {
+        language.split(separator: "-").first.map(String.init) ?? language
+    }
+
+    private func inputOutcome(for deliveryOutcome: TranscriptDeliveryOutcome) -> InputEventOutcome {
+        switch deliveryOutcome {
+        case .insertedIntoFocusedApp, .typedIntoFocusedApp, .pasteShortcutSent, .copiedToClipboard, .publishedOnly:
+            return .published
         }
     }
 }

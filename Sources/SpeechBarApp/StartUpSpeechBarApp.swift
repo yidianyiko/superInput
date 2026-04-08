@@ -1,5 +1,8 @@
 import AppKit
 import Combine
+import MemoryCore
+import MemoryExtraction
+import MemoryStorageSQLite
 import SpeechBarApplication
 import SpeechBarDomain
 import SpeechBarInfrastructure
@@ -57,6 +60,7 @@ private struct AppDependencies {
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
     let windowSwitchOverlayStore: WindowSwitchOverlayStore
+    let memoryFeatureFlagStore: MemoryFeatureFlagStore
     let coordinator: VoiceSessionCoordinator
     let diagnosticsCoordinator: DiagnosticsCoordinator
     let agentMonitorCoordinator: AgentMonitorCoordinator
@@ -147,6 +151,28 @@ private struct AppDependencies {
             focusedTextTranscriptPublisher
         ])
         let diagnosticsCoordinator = DiagnosticsCoordinator()
+        let memoryFeatureFlagStore = MemoryFeatureFlagStore()
+        let memoryCoordinator: MemoryCoordinator?
+        do {
+            let memoryDatabaseURL = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent(".slashvibe-memory.sqlite")
+            let memoryKeyProvider = KeychainMemoryKeyProvider(service: "com.startup.speechbar.memory")
+            let memoryStore = try MemoryStorageSQLiteStore(
+                databaseURL: memoryDatabaseURL,
+                keyProvider: memoryKeyProvider
+            )
+            memoryCoordinator = MemoryCoordinator(
+                store: memoryStore,
+                extractor: DefaultMemoryExtractor()
+            )
+        } catch {
+            diagnosticsCoordinator.recordMemoryEvent(
+                "Failed to initialize memory storage",
+                severity: .warning,
+                metadata: ["error": error.localizedDescription]
+            )
+            memoryCoordinator = nil
+        }
         let registry = DefaultAgentRegistry()
         let collectors = registry.makeEnabledCollectors()
         let reducer = DefaultAgentStateReducer(
@@ -167,6 +193,7 @@ private struct AppDependencies {
         self.localWhisperModelStore = localWhisperModelStore
         self.senseVoiceModelStore = senseVoiceModelStore
         self.windowSwitchOverlayStore = windowSwitchOverlayStore
+        self.memoryFeatureFlagStore = memoryFeatureFlagStore
         let coordinator = VoiceSessionCoordinator(
             hardwareSource: hardwareSource,
             audioInputSource: audioInputSource,
@@ -175,8 +202,24 @@ private struct AppDependencies {
             transcriptPublisher: transcriptPublisher,
             windowSwitcher: windowSwitcher,
             transcriptTargetCapturer: focusedTextTranscriptPublisher,
+            focusedSnapshotProvider: focusedTextTranscriptPublisher,
             userProfileProvider: userProfileStore,
-            transcriptPostProcessor: transcriptPostProcessor
+            transcriptPostProcessor: transcriptPostProcessor,
+            memoryRecorder: memoryCoordinator,
+            memoryRetriever: memoryCoordinator,
+            diagnostics: diagnosticsCoordinator,
+            memoryCaptureEnabled: { [memoryFeatureFlagStore] in
+                await MainActor.run { memoryFeatureFlagStore.captureEnabled }
+            },
+            memoryRecallEnabled: { [memoryFeatureFlagStore] in
+                await MainActor.run { memoryFeatureFlagStore.recallEnabled }
+            },
+            memoryOptedOutApps: {
+                Set(UserDefaults.standard.stringArray(forKey: "memory.optedOutApps") ?? [])
+            },
+            memoryOptedOutFieldLabels: {
+                Set(UserDefaults.standard.stringArray(forKey: "memory.optedOutFieldLabels") ?? [])
+            }
         )
         self.coordinator = coordinator
         self.diagnosticsCoordinator = diagnosticsCoordinator
@@ -215,7 +258,8 @@ private struct AppDependencies {
             audioInputSettingsStore: audioInputSettingsStore,
             modelSettingsStore: modelSettingsStore,
             localWhisperModelStore: localWhisperModelStore,
-            senseVoiceModelStore: senseVoiceModelStore
+            senseVoiceModelStore: senseVoiceModelStore,
+            memoryFeatureFlagStore: memoryFeatureFlagStore
         )
         self.recordingOverlayController = RecordingOverlayController(coordinator: coordinator)
         self.windowSwitchOverlayController = WindowSwitchOverlayController(store: windowSwitchOverlayStore)

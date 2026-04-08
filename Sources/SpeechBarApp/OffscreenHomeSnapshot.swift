@@ -104,6 +104,7 @@ enum OffscreenHomeSnapshotRenderer {
             modelSettingsStore: environment.modelSettingsStore,
             localWhisperModelStore: environment.localWhisperModelStore,
             senseVoiceModelStore: environment.senseVoiceModelStore,
+            memoryFeatureFlagStore: environment.memoryFeatureFlagStore,
             pushToTalkSource: environment.pushToTalkSource
         )
         .frame(width: command.width, height: command.height)
@@ -160,6 +161,7 @@ private final class SnapshotEnvironment {
     let modelSettingsStore: OpenAIModelSettingsStore
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
+    let memoryFeatureFlagStore: MemoryFeatureFlagStore
     let homeStore: HomeWindowStore
 
     init(defaults: UserDefaults) {
@@ -209,6 +211,7 @@ private final class SnapshotEnvironment {
 
         self.userProfileStore = UserProfileStore(defaults: defaults)
         self.audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
+        self.memoryFeatureFlagStore = MemoryFeatureFlagStore(defaults: defaults)
         self.diagnosticsCoordinator = DiagnosticsCoordinator(
             baseDirectory: FileManager.default.temporaryDirectory
                 .appendingPathComponent("slashvibe-offscreen-diagnostics", isDirectory: true)

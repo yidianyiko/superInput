@@ -1,4 +1,5 @@
 import Foundation
+import MemoryDomain
 import SpeechBarDomain
 
 final class MockHardwareEventSource: HardwareEventSource, @unchecked Sendable {
@@ -155,6 +156,52 @@ actor MockTranscriptPublisher: TranscriptPublisher {
     }
 }
 
+actor MockMemoryRecorder: MemoryEventRecording {
+    private(set) var recordedEvents: [InputEvent] = []
+
+    func record(event: InputEvent) async throws {
+        recordedEvents.append(event)
+    }
+
+    var recordedEventCount: Int {
+        get async { recordedEvents.count }
+    }
+
+    func snapshot() -> [InputEvent] {
+        recordedEvents
+    }
+}
+
+struct MockMemoryRetriever: MemoryRetriever {
+    var bundle: RecallBundle
+
+    func recall(for request: RecallRequest) async throws -> RecallBundle {
+        bundle
+    }
+}
+
+struct MockFocusedInputSnapshotProvider: FocusedInputSnapshotProviding {
+    var snapshot: FocusedInputSnapshot? = FocusedInputSnapshot(
+        appIdentifier: "com.apple.TextEdit",
+        appName: "TextEdit",
+        windowTitle: "Untitled",
+        pageTitle: nil,
+        fieldRole: "AXTextArea",
+        fieldLabel: "Body",
+        isEditable: true,
+        isSecure: false
+    )
+    var observedText: String? = "ni hao"
+
+    func currentFocusedInputSnapshot() async -> FocusedInputSnapshot? {
+        snapshot
+    }
+
+    func observedTextAfterPublish() async -> String? {
+        observedText
+    }
+}
+
 struct ImmediateSleepClock: SleepClock {
     func sleep(for duration: Duration) async throws {}
 }
@@ -171,12 +218,14 @@ final class MockTranscriptPostProcessor: TranscriptPostProcessor, @unchecked Sen
     var polishedText: String?
     var error: Error?
     private(set) var receivedTranscripts: [String] = []
+    private(set) var receivedContexts: [UserProfileContext] = []
 
     func polish(
         transcript: String,
         context: UserProfileContext
     ) async throws -> String {
         receivedTranscripts.append(transcript)
+        receivedContexts.append(context)
         if let error {
             throw error
         }

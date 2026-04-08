@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import SpeechBarApplication
+import MemoryDomain
 import SpeechBarDomain
 
 @Suite("VoiceSessionCoordinator")
@@ -424,16 +425,198 @@ struct VoiceSessionCoordinatorTests {
         #expect(published.map(\.text) == [polishedTranscript])
         #expect(coordinator.lastPolishFallbackReason == nil)
     }
+
+    @Test
+    @MainActor
+    func successfulPublishRecordsObservedInputEvent() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let recorder = MockMemoryRecorder()
+        let snapshotProvider = MockFocusedInputSnapshotProvider()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            focusedSnapshotProvider: snapshotProvider,
+            memoryRecorder: recorder,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+        try await eventually { coordinator.sessionState == .recording }
+        client.emit(.final("ni hao"))
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventuallyAsync { await recorder.recordedEventCount == 1 }
+    }
+
+    @Test
+    @MainActor
+    func optedOutFieldLabelsClassifyRecordedEventAsOptOut() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let recorder = MockMemoryRecorder()
+        let snapshotProvider = MockFocusedInputSnapshotProvider(
+            snapshot: FocusedInputSnapshot(
+                appIdentifier: "com.apple.TextEdit",
+                appName: "TextEdit",
+                windowTitle: "Untitled",
+                pageTitle: nil,
+                fieldRole: "AXTextArea",
+                fieldLabel: "Body",
+                isEditable: true,
+                isSecure: false
+            )
+        )
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            focusedSnapshotProvider: snapshotProvider,
+            memoryRecorder: recorder,
+            sleepClock: ImmediateSleepClock(),
+            memoryOptedOutFieldLabels: { ["body"] }
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+        try await eventually { coordinator.sessionState == .recording }
+        client.emit(.final("ni hao"))
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventuallyAsync { await recorder.recordedEventCount == 1 }
+        let event = await recorder.snapshot().last
+        #expect(event?.sensitivityClass == .optOut)
+    }
+
+    @Test
+    @MainActor
+    func recallAddsKeywordsToTranscriptionConfiguration() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let retriever = MockMemoryRetriever(
+            bundle: RecallBundle(
+                vocabularyHints: ["OpenAI API", "Coze Space"],
+                correctionHints: ["扣子空间->Coze Space"],
+                styleHints: [],
+                sceneHints: [],
+                diagnosticSummary: "test"
+            )
+        )
+        let snapshotProvider = MockFocusedInputSnapshotProvider()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            focusedSnapshotProvider: snapshotProvider,
+            memoryRetriever: retriever,
+            sleepClock: ImmediateSleepClock(),
+            memoryRecallEnabled: { true }
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            client.lastConfiguration?.keywords.contains("OpenAI API") == true
+        }
+    }
+
+    @Test
+    @MainActor
+    func recallAugmentsPolishContextMemoryProfile() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let postProcessor = MockTranscriptPostProcessor()
+        let retriever = MockMemoryRetriever(
+            bundle: RecallBundle(
+                vocabularyHints: [],
+                correctionHints: [],
+                styleHints: ["tone=polite", "brevity=short"],
+                sceneHints: ["app=com.apple.mail"],
+                diagnosticSummary: "test"
+            )
+        )
+        let snapshotProvider = MockFocusedInputSnapshotProvider()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            focusedSnapshotProvider: snapshotProvider,
+            userProfileProvider: MockUserProfileContextProvider(),
+            transcriptPostProcessor: postProcessor,
+            memoryRetriever: retriever,
+            sleepClock: ImmediateSleepClock(),
+            memoryRecallEnabled: { true }
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+        try await eventually { coordinator.sessionState == .recording }
+        client.emit(.final("hello world this needs polish"))
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventually { !postProcessor.receivedContexts.isEmpty }
+        #expect(postProcessor.receivedContexts.last?.memoryProfile.contains("tone=polite") == true)
+    }
 }
 
 private enum TestFailure: Error {
     case timeout
 }
 
+@MainActor
 private func eventually(
     timeout: Duration = .seconds(2),
     pollInterval: Duration = .milliseconds(20),
     _ predicate: @escaping @MainActor () -> Bool
+) async throws {
+    let clock = ContinuousClock()
+    let deadline = clock.now.advanced(by: timeout)
+
+    while clock.now < deadline {
+        if predicate() {
+            return
+        }
+        try await clock.sleep(for: pollInterval)
+    }
+
+    throw TestFailure.timeout
+}
+
+@MainActor
+private func eventuallyAsync(
+    timeout: Duration = .seconds(2),
+    pollInterval: Duration = .milliseconds(20),
+    _ predicate: @escaping () async -> Bool
 ) async throws {
     let clock = ContinuousClock()
     let deadline = clock.now.advanced(by: timeout)

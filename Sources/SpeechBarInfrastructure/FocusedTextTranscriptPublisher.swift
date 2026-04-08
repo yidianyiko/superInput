@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Darwin
 import Foundation
+import MemoryDomain
 import SpeechBarDomain
 
 private func debugLog(_ message: String) {
@@ -590,9 +591,156 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
         debugLog("modifier keys still active when paste timeout elapsed")
     }
 
+    @MainActor
+    private func snapshot(for target: CapturedFocusTarget) -> FocusedInputSnapshot? {
+        guard let element = target.element else {
+            return nil
+        }
+
+        let application = applicationTracker.application(processIdentifier: target.processIdentifier)
+        let appIdentifier = application?.bundleIdentifier ?? "unknown"
+        let appName = application?.localizedName ?? appIdentifier
+        let windowTitle = target.windowElement.flatMap { stringAttribute(kAXTitleAttribute as CFString, from: $0) }
+        let fieldRole = stringAttribute(kAXRoleAttribute as CFString, from: element) ?? "AXUnknown"
+        let fieldLabel = fieldLabel(for: element)
+
+        return FocusedInputSnapshot(
+            appIdentifier: appIdentifier,
+            appName: appName,
+            windowTitle: windowTitle,
+            pageTitle: nil,
+            fieldRole: fieldRole,
+            fieldLabel: fieldLabel,
+            isEditable: isEditableInput(element),
+            isSecure: isSecureInput(element, role: fieldRole, label: fieldLabel)
+        )
+    }
+
+    @MainActor
+    private func fieldLabel(for element: AXUIElement) -> String? {
+        let attributes: [CFString] = [
+            kAXDescriptionAttribute as CFString,
+            kAXTitleAttribute as CFString,
+            "AXPlaceholderValue" as CFString,
+            "AXHelp" as CFString
+        ]
+
+        for attribute in attributes {
+            guard let value = stringAttribute(attribute, from: element)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                  !value.isEmpty else {
+                continue
+            }
+            return value
+        }
+
+        return nil
+    }
+
+    @MainActor
+    private func isEditableInput(_ element: AXUIElement) -> Bool {
+        if boolAttribute(kAXEnabledAttribute as CFString, from: element) == false {
+            return false
+        }
+
+        let role = stringAttribute(kAXRoleAttribute as CFString, from: element) ?? ""
+        let subrole = stringAttribute(kAXSubroleAttribute as CFString, from: element) ?? ""
+        let editable = boolAttribute("AXEditable" as CFString, from: element) ?? false
+
+        if editable {
+            return true
+        }
+
+        let acceptedRoles: Set<String> = [
+            kAXTextFieldRole as String,
+            kAXTextAreaRole as String,
+            "AXSearchField",
+            kAXComboBoxRole as String
+        ]
+
+        if acceptedRoles.contains(role) {
+            return true
+        }
+
+        if role == kAXGroupRole as String && subrole.lowercased().contains("text") {
+            return true
+        }
+
+        return false
+    }
+
+    @MainActor
+    private func isSecureInput(_ element: AXUIElement, role: String, label: String?) -> Bool {
+        if role.lowercased().contains("secure") || role.lowercased().contains("password") {
+            return true
+        }
+
+        if boolAttribute("AXProtectedContent" as CFString, from: element) == true {
+            return true
+        }
+
+        guard let label = label?.lowercased() else {
+            return false
+        }
+
+        let secureKeywords = ["password", "passcode", "token", "otp", "验证码", "密码", "口令"]
+        return secureKeywords.contains { label.contains($0) }
+    }
+
+    @MainActor
+    private func stringAttribute(_ attribute: CFString, from element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard status == .success else { return nil }
+        return value as? String
+    }
+
+    @MainActor
+    private func boolAttribute(_ attribute: CFString, from element: AXUIElement) -> Bool? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard status == .success else { return nil }
+
+        if let value = value as? Bool {
+            return value
+        }
+        if let value = value as? NSNumber {
+            return value.boolValue
+        }
+        return nil
+    }
+
 }
 
 extension FocusedTextTranscriptPublisher: TranscriptTargetCapturing {}
+extension FocusedTextTranscriptPublisher: FocusedInputSnapshotProviding {
+    public func currentFocusedInputSnapshot() async -> FocusedInputSnapshot? {
+        let target = await MainActor.run {
+            rememberedTarget ?? captureFocusTarget()
+        }
+        guard let target else {
+            return nil
+        }
+        return await MainActor.run {
+            snapshot(for: target)
+        }
+    }
+
+    public func observedTextAfterPublish() async -> String? {
+        await MainActor.run {
+            let target = rememberedTarget ?? captureFocusTarget()
+            if let element = target?.element, let value = stringValue(for: element) {
+                return value
+            }
+
+            guard let processIdentifier = target?.processIdentifier ?? applicationTracker.lastExternalProcessIdentifier(),
+                  let element = focusedElement(processIdentifier: processIdentifier) else {
+                return nil
+            }
+            return stringValue(for: element)
+        }
+    }
+}
 
 private final class CapturedFocusTarget: @unchecked Sendable {
     let processIdentifier: pid_t

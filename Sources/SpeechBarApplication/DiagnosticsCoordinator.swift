@@ -105,6 +105,19 @@ public final class DiagnosticsCoordinator: ObservableObject {
         writeJSONLine(event, to: diagnosticsFile)
     }
 
+    public func recordMemoryEvent(
+        _ message: String,
+        severity: DiagnosticSeverity = .info,
+        metadata: [String: String] = [:]
+    ) {
+        recordDiagnostic(
+            subsystem: "memory",
+            severity: severity,
+            message: message,
+            metadata: metadata
+        )
+    }
+
     public func captureReplayBundle(reason: String, provider: AgentProvider?) {
         let bundleID = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let replayDirectory = baseDirectory

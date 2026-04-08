@@ -10,6 +10,10 @@ let package = Package(
         .library(name: "SpeechBarDomain", targets: ["SpeechBarDomain"]),
         .library(name: "SpeechBarApplication", targets: ["SpeechBarApplication"]),
         .library(name: "SpeechBarInfrastructure", targets: ["SpeechBarInfrastructure"]),
+        .library(name: "MemoryDomain", targets: ["MemoryDomain"]),
+        .library(name: "MemoryCore", targets: ["MemoryCore"]),
+        .library(name: "MemoryExtraction", targets: ["MemoryExtraction"]),
+        .library(name: "MemoryStorageSQLite", targets: ["MemoryStorageSQLite"]),
         .executable(name: "SpeechBarApp", targets: ["SpeechBarApp"])
     ],
     dependencies: [
@@ -20,13 +24,29 @@ let package = Package(
             name: "SpeechBarDomain"
         ),
         .target(
+            name: "MemoryDomain"
+        ),
+        .target(
+            name: "MemoryExtraction",
+            dependencies: ["MemoryDomain"]
+        ),
+        .target(
+            name: "MemoryStorageSQLite",
+            dependencies: ["MemoryDomain"]
+        ),
+        .target(
+            name: "MemoryCore",
+            dependencies: ["MemoryDomain", "MemoryExtraction", "MemoryStorageSQLite"]
+        ),
+        .target(
             name: "SpeechBarApplication",
-            dependencies: ["SpeechBarDomain"]
+            dependencies: ["SpeechBarDomain", "MemoryDomain", "MemoryCore"]
         ),
         .target(
             name: "SpeechBarInfrastructure",
             dependencies: [
                 "SpeechBarDomain",
+                "MemoryDomain",
                 .product(name: "SwiftWhisper", package: "SwiftWhisper")
             ]
         ),
@@ -34,6 +54,21 @@ let package = Package(
             name: "SpeechBarApp",
             dependencies: [
                 "SpeechBarDomain",
+                "SpeechBarApplication",
+                "SpeechBarInfrastructure",
+                "MemoryDomain",
+                "MemoryCore",
+                "MemoryExtraction",
+                "MemoryStorageSQLite"
+            ]
+        ),
+        .testTarget(
+            name: "MemoryTests",
+            dependencies: [
+                "MemoryDomain",
+                "MemoryCore",
+                "MemoryExtraction",
+                "MemoryStorageSQLite",
                 "SpeechBarApplication",
                 "SpeechBarInfrastructure"
             ]
@@ -44,7 +79,9 @@ let package = Package(
                 "SpeechBarApp",
                 "SpeechBarDomain",
                 "SpeechBarApplication",
-                "SpeechBarInfrastructure"
+                "SpeechBarInfrastructure",
+                "MemoryDomain",
+                "MemoryCore"
             ]
         )
     ],

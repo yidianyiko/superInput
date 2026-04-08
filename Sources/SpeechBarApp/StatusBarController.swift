@@ -23,7 +23,8 @@ final class StatusBarController: NSObject {
         audioInputSettingsStore: AudioInputSettingsStore,
         modelSettingsStore: OpenAIModelSettingsStore,
         localWhisperModelStore: LocalWhisperModelStore,
-        senseVoiceModelStore: SenseVoiceModelStore
+        senseVoiceModelStore: SenseVoiceModelStore,
+        memoryFeatureFlagStore: MemoryFeatureFlagStore
     ) {
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         self.popover = NSPopover()
@@ -38,7 +39,8 @@ final class StatusBarController: NSObject {
             audioInputSettingsStore: audioInputSettingsStore,
             modelSettingsStore: modelSettingsStore,
             localWhisperModelStore: localWhisperModelStore,
-            senseVoiceModelStore: senseVoiceModelStore
+            senseVoiceModelStore: senseVoiceModelStore,
+            memoryFeatureFlagStore: memoryFeatureFlagStore
         )
         super.init()
 

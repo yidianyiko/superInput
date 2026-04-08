@@ -16,6 +16,7 @@ struct HomeWindowView: View {
     @ObservedObject var modelSettingsStore: OpenAIModelSettingsStore
     @ObservedObject var localWhisperModelStore: LocalWhisperModelStore
     @ObservedObject var senseVoiceModelStore: SenseVoiceModelStore
+    @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
     let pushToTalkSource: OnScreenPushToTalkSource
 
     private let contentMaxWidth: CGFloat = 1_080
@@ -682,6 +683,25 @@ struct HomeWindowView: View {
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
+                }
+            }
+
+            GlassCard(palette: store.palette, padding: 22) {
+                VStack(alignment: .leading, spacing: 16) {
+                    sectionHeader(
+                        title: "输入记忆",
+                        subtitle: "采集默认开启，召回默认关闭，便于先观察本地学习效果。"
+                    )
+
+                    Toggle("启用记忆采集", isOn: $memoryFeatureFlagStore.captureEnabled)
+                        .toggleStyle(.switch)
+
+                    Toggle("启用记忆召回", isOn: $memoryFeatureFlagStore.recallEnabled)
+                        .toggleStyle(.switch)
+
+                    Text("记忆仅保存在本机，敏感输入会被排除或脱敏处理。")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
             }
 
