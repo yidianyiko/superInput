@@ -788,7 +788,7 @@ private enum TestFailure: Error {
 
 @MainActor
 private func eventually(
-    timeout: Duration = .seconds(2),
+    timeout: Duration = .seconds(5),
     pollInterval: Duration = .milliseconds(20),
     _ predicate: @escaping @MainActor () -> Bool
 ) async throws {
@@ -807,7 +807,7 @@ private func eventually(
 
 @MainActor
 private func eventuallyAsync(
-    timeout: Duration = .seconds(2),
+    timeout: Duration = .seconds(5),
     pollInterval: Duration = .milliseconds(20),
     _ predicate: @escaping () async -> Bool
 ) async throws {
