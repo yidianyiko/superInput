@@ -202,13 +202,13 @@ public final class VoiceSessionCoordinator: ObservableObject {
 
     private func mapAppIntent(from event: HardwareEvent) -> AppIntent {
         switch event.kind {
-        case .pushToTalkPressed:
+        case .pushToTalkPressed, .pressPrimary:
             return .startVoiceCapture(source: event.source)
-        case .pushToTalkReleased:
+        case .pushToTalkReleased, .pressSecondary, .dismissSelected:
             return .stopVoiceCapture(source: event.source)
-        case .rotaryClockwise:
+        case .rotaryClockwise, .switchBoardNext:
             return .switchWindow(direction: .next, source: event.source)
-        case .rotaryCounterClockwise:
+        case .rotaryCounterClockwise, .switchBoardPrevious:
             return .switchWindow(direction: .previous, source: event.source)
         }
     }

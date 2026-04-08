@@ -192,6 +192,16 @@ public final class BoardEventFileHardwareEventSource: HardwareEventSource, @unch
             return .rotaryClockwise
         case "rotaryCounterClockwise":
             return .rotaryCounterClockwise
+        case "pressPrimary":
+            return .pressPrimary
+        case "pressSecondary":
+            return .pressSecondary
+        case "dismissSelected":
+            return .dismissSelected
+        case "switchBoardNext":
+            return .switchBoardNext
+        case "switchBoardPrevious":
+            return .switchBoardPrevious
         default:
             return nil
         }

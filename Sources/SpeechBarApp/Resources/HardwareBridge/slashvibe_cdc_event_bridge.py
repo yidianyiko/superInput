@@ -32,6 +32,11 @@ EVENT_KIND_MAP = {
     proto.INPUT_EVENT_PUSH_TO_TALK_RELEASED: "pushToTalkReleased",
     proto.INPUT_EVENT_ROTATE_NEXT: "rotaryClockwise",
     proto.INPUT_EVENT_ROTATE_PREVIOUS: "rotaryCounterClockwise",
+    proto.INPUT_EVENT_PRESS_PRIMARY: "pressPrimary",
+    proto.INPUT_EVENT_PRESS_SECONDARY: "pressSecondary",
+    proto.INPUT_EVENT_DISMISS_SELECTED: "dismissSelected",
+    proto.INPUT_EVENT_SWITCH_BOARD_NEXT: "switchBoardNext",
+    proto.INPUT_EVENT_SWITCH_BOARD_PREVIOUS: "switchBoardPrevious",
 }
 
 

@@ -15,6 +15,11 @@ public enum HardwareEventKind: String, Sendable, Equatable {
     case pushToTalkReleased
     case rotaryClockwise
     case rotaryCounterClockwise
+    case pressPrimary
+    case pressSecondary
+    case dismissSelected
+    case switchBoardNext
+    case switchBoardPrevious
 }
 
 public struct HardwareEvent: Sendable, Equatable {
