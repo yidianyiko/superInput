@@ -34,8 +34,12 @@ final class MemoryConstellationStore: ObservableObject {
         rebuildSnapshot()
     }
 
-    func hoverCluster(_ kind: MemoryConstellationClusterKind) {
-        focus = .cluster(kind)
+    func hoverCluster(_ cluster: MemoryConstellationClusterKind?) {
+        if let cluster {
+            focus = .cluster(cluster)
+        } else {
+            focus = .overview
+        }
         rebuildSnapshot()
     }
 
@@ -44,13 +48,20 @@ final class MemoryConstellationStore: ObservableObject {
         rebuildSnapshot()
     }
 
-    func focusBridge(_ bridgeID: UUID) {
-        focus = .bridge(bridgeID)
+    func focusBridge(_ bridgeID: UUID?) {
+        if let bridgeID {
+            focus = .bridge(bridgeID)
+        } else {
+            focus = .overview
+        }
         rebuildSnapshot()
     }
 
     func selectViewMode(_ viewMode: MemoryConstellationViewMode) {
         selectedViewMode = viewMode
+        if viewMode != .timelineReplay {
+            selectedTimelineWindowID = nil
+        }
         rebuildSnapshot()
     }
 
