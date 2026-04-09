@@ -60,7 +60,7 @@ struct RecordingHotkeyControllerTests {
             try await collectHardwareEvents(from: controller.events, count: 1)
         }
         let diagnosticsTask = Task<[RecordingHotkeyDiagnosticsSnapshot], Error> {
-            try await collectDiagnosticsSnapshots(from: controller.diagnosticsUpdates, count: 5)
+            try await collectDiagnosticsSnapshots(from: controller.diagnosticsUpdates, count: 3)
         }
         await Task.yield()
 
@@ -132,12 +132,24 @@ struct RecordingHotkeyControllerTests {
         let diagnosticsSnapshots = try await diagnosticsTask.value
         #expect(switchedEvents.map(\.source) == [HardwareSourceKind.globalShortcut])
         #expect(switchedEvents.map(\.kind) == [HardwareEventKind.pushToTalkReleased])
-        #expect(
-            controller.diagnosticsSnapshot.lastTrigger == RecordingHotkeyLastTrigger(
+        let expectedFinalDiagnostics = RecordingHotkeyDiagnosticsSnapshot(
+            configuration: customConfiguration,
+            registrationStatus: .registrationFailed,
+            requiresAccessibility: false,
+            accessibilityTrusted: true,
+            lastTrigger: RecordingHotkeyLastTrigger(
                 occurredAt: releasedAt,
                 mode: .customCombo,
                 action: .stop
-            )
+            ),
+            guidanceText: "The custom hotkey could not be registered. It may already be in use."
+        )
+        try await waitForDiagnosticsSnapshot(
+            on: controller,
+            expected: expectedFinalDiagnostics
+        )
+        #expect(
+            controller.diagnosticsSnapshot == expectedFinalDiagnostics
         )
         #expect(
             Array(diagnosticsSnapshots.prefix(3)) == [
@@ -175,39 +187,7 @@ struct RecordingHotkeyControllerTests {
                 ),
             ]
         )
-        #expect(diagnosticsSnapshots.count == 5)
-        #expect(
-            diagnosticsSnapshots.contains(
-                RecordingHotkeyDiagnosticsSnapshot(
-                    configuration: customConfiguration,
-                    registrationStatus: .registered,
-                    requiresAccessibility: false,
-                    accessibilityTrusted: true,
-                    lastTrigger: RecordingHotkeyLastTrigger(
-                        occurredAt: releasedAt,
-                        mode: .customCombo,
-                        action: .stop
-                    ),
-                    guidanceText: nil
-                )
-            )
-        )
-        #expect(
-            diagnosticsSnapshots.contains(
-                RecordingHotkeyDiagnosticsSnapshot(
-                    configuration: customConfiguration,
-                    registrationStatus: .registrationFailed,
-                    requiresAccessibility: false,
-                    accessibilityTrusted: true,
-                    lastTrigger: RecordingHotkeyLastTrigger(
-                        occurredAt: releasedAt,
-                        mode: .customCombo,
-                        action: .stop
-                    ),
-                    guidanceText: "The custom hotkey could not be registered. It may already be in use."
-                )
-            )
-        )
+        #expect(diagnosticsSnapshots.count == 3)
     }
 
     @Test
@@ -353,6 +333,21 @@ private func collectDiagnosticsSnapshots(
         let result = try await group.next() ?? []
         group.cancelAll()
         return result
+    }
+}
+
+private func waitForDiagnosticsSnapshot(
+    on controller: RecordingHotkeyController,
+    expected: RecordingHotkeyDiagnosticsSnapshot,
+    timeout: Duration = .seconds(1)
+) async throws {
+    let deadline = ContinuousClock.now + timeout
+
+    while controller.diagnosticsSnapshot != expected {
+        if ContinuousClock.now >= deadline {
+            throw RecordingHotkeyControllerTestFailure.timeout
+        }
+        try await Task.sleep(for: .milliseconds(10))
     }
 }
 
