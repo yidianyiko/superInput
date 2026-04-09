@@ -16,6 +16,28 @@ struct RecordingHotkeyConfigurationTests {
     }
 
     @Test
+    func formatsAlphabeticKeysForDisplay() {
+        let combination = RecordingHotkeyCombination(
+            keyCode: UInt32(kVK_ANSI_A),
+            modifiers: UInt32(cmdKey)
+        )
+
+        #expect(combination.validationResult == .valid)
+        #expect(combination.displayString == "⌘A")
+    }
+
+    @Test
+    func formatsDigitKeysForDisplay() {
+        let combination = RecordingHotkeyCombination(
+            keyCode: UInt32(kVK_ANSI_1),
+            modifiers: UInt32(optionKey)
+        )
+
+        #expect(combination.validationResult == .valid)
+        #expect(combination.displayString == "⌥1")
+    }
+
+    @Test
     func rejectsBareKeysAndModifierOnlyCombinations() {
         let bareKey = RecordingHotkeyCombination(
             keyCode: UInt32(kVK_ANSI_R),
@@ -45,6 +67,14 @@ struct RecordingHotkeyConfigurationTests {
         let configuration = RecordingHotkeyConfiguration.defaultCustom
 
         #expect(configuration.mode == .customCombo)
+        #expect(configuration.customCombination.displayString == "⌃⌥⌘R")
+    }
+
+    @Test
+    func defaultRightCommandConfigurationUsesStartupMode() {
+        let configuration = RecordingHotkeyConfiguration.defaultRightCommand
+
+        #expect(configuration.mode == .rightCommand)
         #expect(configuration.customCombination.displayString == "⌃⌥⌘R")
     }
 }
