@@ -398,7 +398,7 @@ struct VoiceSessionCoordinatorTests {
 
         try await eventually {
             if case .failed(let message) = coordinator.sessionState {
-                return message == "No speech was detected. Try again."
+                return message == "没有检测到语音，请重试。"
             }
             return false
         }
@@ -1070,13 +1070,10 @@ private enum TestFailure: Error {
     case timeout
 }
 
-<<<<<<< HEAD
 private enum MockFailure: Error {
     case publish
 }
 
-@MainActor
-=======
 private final class StartCaptureOrderCredentialProvider: CredentialProvider, @unchecked Sendable {
     private let audio: MockAudioInputSource
     private(set) var sawStartedCaptureBeforeLoad = false
@@ -1099,7 +1096,7 @@ private final class StartCaptureOrderCredentialProvider: CredentialProvider, @un
     func deleteAPIKey() throws {}
 }
 
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
+@MainActor
 private func eventually(
     timeout: Duration = .seconds(5),
     pollInterval: Duration = .milliseconds(20),

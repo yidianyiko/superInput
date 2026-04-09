@@ -1262,12 +1262,8 @@ struct HomeWindowView: View {
             PageTitle(
                 eyebrow: "模型",
                 title: "接口与模型配置",
-<<<<<<< HEAD
                 subtitle: "可在 Deepgram、Whisper API、本地 Whisper 与本地 SenseVoice 间切换。",
                 palette: palette
-=======
-                subtitle: "可在 Deepgram、Whisper API、本地 Whisper、本地 SenseVoice 间切换。"
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
             )
 
             HStack(alignment: .top, spacing: 18) {

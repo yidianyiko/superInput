@@ -22,15 +22,9 @@ xcuserdata/
 
 docs/mac-background-app-mounting-summary.md
 
-<<<<<<< HEAD
 docs/current-mac-speech-cloud-api-summary.md
-=======
-Docs/current-mac-speech-cloud-api-summary.md
 
 *.zip
 *.app/
 mac_handoff_*/
 slashvibe_v1_firmware-codex-slashvibe-bringup-autopilot/
-
-*.md
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)

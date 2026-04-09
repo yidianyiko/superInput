@@ -255,7 +255,6 @@ private struct AppDependencies {
             focusedSnapshotProvider: focusedTextTranscriptPublisher,
             userProfileProvider: userProfileStore,
             transcriptPostProcessor: transcriptPostProcessor,
-<<<<<<< HEAD
             memoryRecorder: memoryCoordinator,
             memoryRetriever: memoryCoordinator,
             diagnostics: diagnosticsCoordinator,
@@ -270,10 +269,9 @@ private struct AppDependencies {
             },
             memoryOptedOutFieldLabels: {
                 Set(UserDefaults.standard.stringArray(forKey: "memory.optedOutFieldLabels") ?? [])
-=======
+            },
             shouldUseIncrementalInterimPublishing: {
                 false
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
             }
         )
         self.coordinator = coordinator

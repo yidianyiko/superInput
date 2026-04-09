@@ -732,7 +732,6 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
     }
 
     @MainActor
-<<<<<<< HEAD
     private func snapshot(for target: CapturedFocusTarget) -> FocusedInputSnapshot? {
         guard let element = target.element else {
             return nil
@@ -937,7 +936,9 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
             elementFrame: elementFrame,
             destinationPoint: resolvedGeometry.destinationPoint
         )
-=======
+    }
+
+    @MainActor
     private func postDeleteBackward(count: Int, processIdentifier: pid_t?) -> Bool {
         guard count > 0 else { return true }
 
@@ -993,7 +994,6 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
         text
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
     }
 
 }

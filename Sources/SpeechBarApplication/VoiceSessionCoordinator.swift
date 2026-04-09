@@ -58,14 +58,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private let diagnostics: DiagnosticsCoordinator?
     private let baseConfiguration: LiveTranscriptionConfiguration
     private let sleepClock: any SleepClock
-<<<<<<< HEAD
     private let memoryCaptureEnabled: @Sendable () async -> Bool
     private let memoryRecallEnabled: @Sendable () async -> Bool
     private let memoryOptedOutApps: @Sendable () async -> Set<String>
     private let memoryOptedOutFieldLabels: @Sendable () async -> Set<String>
-=======
     private let shouldUseIncrementalInterimPublishing: @Sendable () -> Bool
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 
     private var hardwareTask: Task<Void, Never>?
     private var transcriptionEventTask: Task<Void, Never>?
@@ -81,17 +78,14 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private var shouldFinalizeWhenReady = false
     private var isCompletingActiveSession = false
     private var finalSegments: [String] = []
-<<<<<<< HEAD
     private var activeRecallBundle: RecallBundle?
     private var lastAudioLevelWindowUpdateAt: Date?
-=======
     private var isTranscriptionConnectionReady = false
     private var pendingConnectionAudioChunks: [AudioChunk] = []
     private var pendingConnectionAudioBytes = 0
     private let maxPendingConnectionAudioBytes = 160_000
     private let finalizeRequestTimeout: Duration = .seconds(10)
     private var isStreamingInterimPublishingActive = false
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 
     public init(
         hardwareSource: any HardwareEventSource,
@@ -99,11 +93,8 @@ public final class VoiceSessionCoordinator: ObservableObject {
         transcriptionClient: any TranscriptionClient,
         credentialProvider: any CredentialProvider,
         transcriptPublisher: any TranscriptPublisher,
-<<<<<<< HEAD
         publishFeedbackNotifier: TranscriptPublishFeedbackNotifier = TranscriptPublishFeedbackNotifier(),
-=======
         streamingTranscriptPublisher: (any StreamingTranscriptPublisher)? = nil,
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         windowSwitcher: (any WindowSwitching)? = nil,
         returnKeyHandler: @escaping @Sendable () -> Void = {
             guard let source = CGEventSource(stateID: .combinedSessionState)
@@ -127,25 +118,19 @@ public final class VoiceSessionCoordinator: ObservableObject {
         diagnostics: DiagnosticsCoordinator? = nil,
         configuration: LiveTranscriptionConfiguration = LiveTranscriptionConfiguration(),
         sleepClock: any SleepClock = ContinuousSleepClock(),
-<<<<<<< HEAD
         memoryCaptureEnabled: @escaping @Sendable () async -> Bool = { true },
         memoryRecallEnabled: @escaping @Sendable () async -> Bool = { false },
         memoryOptedOutApps: @escaping @Sendable () async -> Set<String> = { [] },
-        memoryOptedOutFieldLabels: @escaping @Sendable () async -> Set<String> = { [] }
-=======
+        memoryOptedOutFieldLabels: @escaping @Sendable () async -> Set<String> = { [] },
         shouldUseIncrementalInterimPublishing: @escaping @Sendable () -> Bool = { false }
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
     ) {
         self.hardwareSource = hardwareSource
         self.audioInputSource = audioInputSource
         self.transcriptionClient = transcriptionClient
         self.credentialProvider = credentialProvider
         self.transcriptPublisher = transcriptPublisher
-<<<<<<< HEAD
         self.publishFeedbackNotifier = publishFeedbackNotifier
-=======
         self.streamingTranscriptPublisher = streamingTranscriptPublisher
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         self.windowSwitcher = windowSwitcher
         self.returnKeyHandler = returnKeyHandler
         self.transcriptTargetCapturer = transcriptTargetCapturer
@@ -157,14 +142,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
         self.diagnostics = diagnostics
         self.baseConfiguration = configuration
         self.sleepClock = sleepClock
-<<<<<<< HEAD
         self.memoryCaptureEnabled = memoryCaptureEnabled
         self.memoryRecallEnabled = memoryRecallEnabled
         self.memoryOptedOutApps = memoryOptedOutApps
         self.memoryOptedOutFieldLabels = memoryOptedOutFieldLabels
-=======
         self.shouldUseIncrementalInterimPublishing = shouldUseIncrementalInterimPublishing
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         self.credentialStatus = credentialProvider.credentialStatus()
     }
 
@@ -332,65 +314,25 @@ public final class VoiceSessionCoordinator: ObservableObject {
         interimTranscript = ""
         finalTranscript = ""
         lastPolishFallbackReason = nil
-<<<<<<< HEAD
         activeRecallBundle = nil
         activeInputHints = []
-        statusMessage = "Preparing microphone..."
-=======
         statusMessage = "正在准备麦克风..."
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         isPushToTalkActive = true
         sessionState = .requestingPermission
+        activeSessionStartedAt = Date()
         overlayPhase = .recording
         overlaySubtitle = "监听中"
         audioLevelWindow = []
-<<<<<<< HEAD
         lastAudioLevelWindowUpdateAt = nil
-
-        let apiKey: String
-        do {
-            apiKey = try credentialProvider.loadAPIKey()
-        } catch {
-            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-            await failActiveSession(
-                message: message.isEmpty ? "Transcription service is not ready." : message
-            )
-            return
-=======
         if isStreamingInterimPublishingActive {
             await streamingTranscriptPublisher?.beginStreamingSession()
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         }
 
         let permission = await audioInputSource.requestRecordPermission()
         guard isCurrentSession(sessionID) else { return }
 
         guard permission == .granted else {
-<<<<<<< HEAD
-            await failActiveSession(message: "Microphone permission is required.")
-            return
-        }
-
-        sessionState = .connecting
-        statusMessage = "Connecting to transcription service..."
-
-        let context = await currentUserProfileContext()
-        activeRecallBundle = await currentRecallBundle()
-        activeInputHints = makeActiveInputHints(context: context, recall: activeRecallBundle)
-        let sessionConfiguration = makeSessionConfiguration(context: context, recall: activeRecallBundle)
-
-        do {
-            try await transcriptionClient.connect(apiKey: apiKey, configuration: sessionConfiguration)
-        } catch {
-            await failActiveSession(message: "Could not connect to the transcription service.")
-            return
-        }
-
-        guard isCurrentSession(sessionID) else {
-            await transcriptionClient.close()
-=======
             await failActiveSession(message: "需要授予麦克风权限。")
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
             return
         }
 
@@ -435,14 +377,13 @@ public final class VoiceSessionCoordinator: ObservableObject {
             }
         }
 
-<<<<<<< HEAD
-        activeSessionStartedAt = Date()
-=======
         sessionState = .connecting
         statusMessage = "正在连接转写服务..."
 
         let context = await currentUserProfileContext()
-        let sessionConfiguration = makeSessionConfiguration(context: context)
+        activeRecallBundle = await currentRecallBundle()
+        activeInputHints = makeActiveInputHints(context: context, recall: activeRecallBundle)
+        let sessionConfiguration = makeSessionConfiguration(context: context, recall: activeRecallBundle)
 
         do {
             try await transcriptionClient.connect(apiKey: apiKey, configuration: sessionConfiguration)
@@ -464,7 +405,6 @@ public final class VoiceSessionCoordinator: ObservableObject {
             return
         }
 
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
         sessionState = .recording
         statusMessage = "正在监听..."
         overlayPhase = .recording
@@ -641,8 +581,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         let deliveryOutcome: TranscriptDeliveryOutcome
         do {
             overlayPhase = .publishing
-<<<<<<< HEAD
-            overlaySubtitle = "Pasting"
+            overlaySubtitle = isStreamingInterimPublishingActive ? "更新中" : "粘贴中"
             publishFeedbackNotifier.notify(
                 .started(
                     TranscriptPublishFeedbackStart(
@@ -652,7 +591,13 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 )
             )
             let publishStartedAt = Date()
-            deliveryOutcome = try await transcriptPublisher.publish(publishedTranscript)
+            if isStreamingInterimPublishingActive, let streamingTranscriptPublisher {
+                deliveryOutcome = try await streamingTranscriptPublisher.finishStreamingSession(
+                    finalText: polishedTranscript
+                )
+            } else {
+                deliveryOutcome = try await transcriptPublisher.publish(publishedTranscript)
+            }
             publishFeedbackNotifier.notify(
                 .completed(
                     TranscriptPublishFeedbackCompletion(
@@ -662,17 +607,6 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 )
             )
             activePublishFeedbackID = nil
-=======
-            overlaySubtitle = isStreamingInterimPublishingActive ? "更新中" : "粘贴中"
-            let publishStartedAt = Date()
-            if isStreamingInterimPublishingActive, let streamingTranscriptPublisher {
-                deliveryOutcome = try await streamingTranscriptPublisher.finishStreamingSession(
-                    finalText: polishedTranscript
-                )
-            } else {
-                deliveryOutcome = try await transcriptPublisher.publish(publishedTranscript)
-            }
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
             performanceLog(
                 "publish finished, publishLatency=\(String(format: "%.3f", Date().timeIntervalSince(publishStartedAt)))s"
             )
@@ -755,14 +689,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activePublishFeedbackID = nil
         activeRecallBundle = nil
         audioLevelWindow = []
-<<<<<<< HEAD
         lastAudioLevelWindowUpdateAt = nil
-=======
         isTranscriptionConnectionReady = false
         pendingConnectionAudioChunks = []
         pendingConnectionAudioBytes = 0
         isStreamingInterimPublishingActive = false
->>>>>>> 5fe97d2 (Day 0408 & First Word detect)
 
         await audioInputSource.stopCapture()
         await transcriptionClient.close()
@@ -824,7 +755,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 try await self.transcriptionClient.finalize()
             }
             group.addTask {
-                try await self.sleepClock.sleep(for: self.finalizeRequestTimeout)
+                try await ContinuousSleepClock().sleep(for: self.finalizeRequestTimeout)
                 throw NSError(
                     domain: "VoiceSessionCoordinator",
                     code: -1,
@@ -832,9 +763,10 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 )
             }
 
-            let result = try await group.next()
+            guard let _ = try await group.next() else {
+                return
+            }
             group.cancelAll()
-            _ = result
         }
     }
 
