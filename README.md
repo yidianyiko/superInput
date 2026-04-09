@@ -1,4 +1,12 @@
+<div align="center">
+
 # SlashVibe
+
+### macOS Menu Bar Speech + Memory Workspace
+
+**活动标签：#小红书黑客松巅峰赛** | GitHub Topic: `redhackathon`
+
+</div>
 
 Minimal macOS push-to-talk speech-to-text app scaffolded for the architecture described in the product and hardware research docs.
 
@@ -92,3 +100,11 @@ swift test
 
 - Install and sharing guide: [INSTALL.md](/Users/lixingting/Desktop/StartUp/Code/INSTALL.md)
 - GitHub upload guide: [GITHUB_SETUP.md](/Users/lixingting/Desktop/StartUp/Code/GITHUB_SETUP.md)
+
+---
+
+<div align="center">
+
+*小红书黑客松巅峰赛 · GitHub Topic `redhackathon`*
+
+</div>

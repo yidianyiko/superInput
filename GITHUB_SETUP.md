@@ -38,6 +38,36 @@ git remote add origin https://github.com/YOUR_NAME/startup-speechbar.git
 git push -u origin main
 ```
 
+## Add repository topics
+
+To mirror the `noterx` repository setup and make the repo easier to discover, add these GitHub Topics after the repo is created:
+
+- `redhackathon`
+- `macos`
+- `swift`
+- `swiftui`
+- `speech-to-text`
+- `transcription`
+- `menu-bar-app`
+- `sqlite`
+
+From the repository homepage on GitHub:
+
+1. In the `About` panel, click the settings gear
+2. Add these topics:
+   `redhackathon`, `macos`, `swift`, `swiftui`, `speech-to-text`, `transcription`, `menu-bar-app`, `sqlite`
+3. Save the change
+
+If you have a GitHub token with repository write access, the same update can be done by API:
+
+```bash
+curl -X PUT \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/yidianyiko/superInput/topics \
+  -d '{"names":["redhackathon","macos","swift","swiftui","speech-to-text","transcription","menu-bar-app","sqlite"]}'
+```
+
 ## Before making the repo public
 
 Double-check that:
