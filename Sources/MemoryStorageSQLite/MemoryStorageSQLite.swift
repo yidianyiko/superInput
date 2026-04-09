@@ -154,6 +154,20 @@ public actor MemoryStorageSQLiteStore: MemoryStore {
         }
     }
 
+    public func markHidden(identityHash: String, hiddenAt: Date) async throws {
+        let sql = """
+        UPDATE memories
+        SET status = ?, updated_at = ?
+        WHERE identity_hash = ?;
+        """
+
+        try execute(sql) { statement in
+            bindText(MemoryStatus.hidden.rawValue, to: statement, at: 1)
+            sqlite3_bind_double(statement, 2, hiddenAt.timeIntervalSince1970)
+            bindText(identityHash, to: statement, at: 3)
+        }
+    }
+
     func compactExpiredEvents() async throws {
         let sql = "DELETE FROM input_events WHERE expires_at < ?;"
         try execute(sql) { statement in

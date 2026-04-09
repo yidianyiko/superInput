@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 import Testing
+import MemoryDomain
 import SpeechBarDomain
 @testable import SpeechBarApp
 import SpeechBarApplication
@@ -141,11 +142,47 @@ struct RecordingOverlayViewTests {
 
         #expect(hostingView.fittingSize == CGSize(width: 172, height: 52))
     }
+
+    @Test
+    @MainActor
+    func recordingPhaseExpandsWhenMemoryHintsAreVisible() async throws {
+        let dependencies = makeRecordingOverlayDependencies(
+            memoryRetriever: MockMemoryRetriever(
+                bundle: RecallBundle(
+                    vocabularyHints: ["Redheak"],
+                    correctionHints: [],
+                    styleHints: ["brevity=short"],
+                    sceneHints: [],
+                    diagnosticSummary: "test"
+                )
+            ),
+            memoryRecallEnabled: true,
+            snapshotProvider: MockFocusedInputSnapshotProvider()
+        )
+        dependencies.coordinator.start()
+
+        dependencies.hardware.send(
+            HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed)
+        )
+
+        try await eventually {
+            dependencies.coordinator.sessionState == .recording &&
+            dependencies.coordinator.activeInputHints.isEmpty == false
+        }
+
+        let hostingView = makeHostingView(coordinator: dependencies.coordinator)
+        hostingView.layoutSubtreeIfNeeded()
+
+        #expect(hostingView.fittingSize == CGSize(width: 272, height: 84))
+    }
 }
 
 @MainActor
 private func makeRecordingOverlayDependencies(
-    finalizeDelay: Duration? = nil
+    finalizeDelay: Duration? = nil,
+    memoryRetriever: (any MemoryRetriever)? = nil,
+    memoryRecallEnabled: Bool = false,
+    snapshotProvider: (any FocusedInputSnapshotProviding)? = nil
 ) -> RecordingOverlayViewTestDependencies {
     let hardware = MockHardwareEventSource()
     let audio = MockAudioInputSource()
@@ -159,7 +196,10 @@ private func makeRecordingOverlayDependencies(
         transcriptionClient: client,
         credentialProvider: credentials,
         transcriptPublisher: publisher,
-        sleepClock: ImmediateSleepClock()
+        focusedSnapshotProvider: snapshotProvider,
+        memoryRetriever: memoryRetriever,
+        sleepClock: ImmediateSleepClock(),
+        memoryRecallEnabled: { memoryRecallEnabled }
     )
 
     return RecordingOverlayViewTestDependencies(

@@ -62,6 +62,8 @@ private actor CatalogStoreStub: MemoryStore {
         return memories.filter { query.statuses.contains($0.status) && query.types.contains($0.type) }
     }
 
+    func markHidden(identityHash: String, hiddenAt: Date) async throws {}
+
     func markDeleted(identityHash: String, deletedAt: Date) async throws {}
 
     func capturedQueries() -> [MemoryCenterQuery] {

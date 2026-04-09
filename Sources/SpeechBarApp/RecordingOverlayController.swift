@@ -51,6 +51,16 @@ final class RecordingOverlayController: NSObject {
                 self?.handleOverlayPhaseChange(phase)
             }
             .store(in: &cancellables)
+
+        coordinator.$activeInputHints
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self, self.coordinator.overlayPhase == .recording else {
+                    return
+                }
+                self.resizePanel(for: self.coordinator.overlayPhase)
+            }
+            .store(in: &cancellables)
     }
 
     private func handleOverlayPhaseChange(_ phase: RecordingOverlayPhase) {
@@ -128,16 +138,11 @@ final class RecordingOverlayController: NSObject {
     }
 
     private func panelSize(for phase: RecordingOverlayPhase) -> NSSize {
-        switch phase {
-        case .recording:
-            NSSize(width: 172, height: 52)
-        case .finalizing, .polishing, .publishing:
-            NSSize(width: 132, height: 40)
-        case .failed:
-            NSSize(width: 152, height: 42)
-        case .hidden:
-            NSSize(width: 132, height: 40)
-        }
+        let size = RecordingOverlayView.fittingSize(
+            overlayPhase: phase,
+            activeInputHints: coordinator.activeInputHints
+        )
+        return NSSize(width: size.width, height: size.height)
     }
 
     private func currentScreen() -> NSScreen? {
@@ -155,6 +160,28 @@ struct RecordingOverlayView: View {
     }
 
     nonisolated static let reducedMotionDecorativeIntensity = 0.22
+
+    nonisolated static func visibleMemoryHints(from activeInputHints: [String]) -> [String] {
+        Array(activeInputHints.prefix(2))
+    }
+
+    nonisolated static func fittingSize(
+        overlayPhase: RecordingOverlayPhase,
+        activeInputHints: [String]
+    ) -> CGSize {
+        switch overlayPhase {
+        case .recording:
+            return visibleMemoryHints(from: activeInputHints).isEmpty
+                ? CGSize(width: 172, height: 52)
+                : CGSize(width: 272, height: 84)
+        case .finalizing, .polishing, .publishing:
+            return CGSize(width: 132, height: 40)
+        case .failed:
+            return CGSize(width: 152, height: 42)
+        case .hidden:
+            return CGSize(width: 132, height: 40)
+        }
+    }
 
     nonisolated static func decorativeState(
         overlayPhase: RecordingOverlayPhase,
@@ -179,12 +206,17 @@ struct RecordingOverlayView: View {
             reduceMotion: reduceMotion,
             samples: coordinator.audioLevelWindow
         )
+        let visibleHints = Self.visibleMemoryHints(from: coordinator.activeInputHints)
 
         return TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: !decorativeState.shouldAnimateTimeline)) { context in
             let phase = decorativeState.shouldAnimateTimeline ? context.date.timeIntervalSinceReferenceDate : 0
 
             if coordinator.overlayPhase == .recording {
-                recordingPill(phase: phase, decorativeIntensity: decorativeState.decorativeIntensity)
+                recordingPill(
+                    phase: phase,
+                    decorativeIntensity: decorativeState.decorativeIntensity,
+                    overlayHints: visibleHints
+                )
                     .frame(width: pillWidth, height: pillHeight)
                     .background(Color.clear)
             } else {
@@ -210,34 +242,27 @@ struct RecordingOverlayView: View {
     }
 
     private var pillWidth: CGFloat {
-        switch coordinator.overlayPhase {
-        case .recording:
-            172
-        case .finalizing, .polishing, .publishing:
-            132
-        case .failed:
-            152
-        case .hidden:
-            132
-        }
+        Self.fittingSize(
+            overlayPhase: coordinator.overlayPhase,
+            activeInputHints: coordinator.activeInputHints
+        ).width
     }
 
     private var pillHeight: CGFloat {
-        switch coordinator.overlayPhase {
-        case .recording:
-            52
-        case .finalizing, .polishing, .publishing:
-            40
-        case .failed:
-            42
-        case .hidden:
-            40
-        }
+        Self.fittingSize(
+            overlayPhase: coordinator.overlayPhase,
+            activeInputHints: coordinator.activeInputHints
+        ).height
     }
 
-    private func recordingPill(phase: TimeInterval, decorativeIntensity: Double) -> some View {
+    private func recordingPill(
+        phase: TimeInterval,
+        decorativeIntensity: Double,
+        overlayHints: [String]
+    ) -> some View {
         let glowOpacity = RecordingOverlayMotion.edgeGlowOpacity(intensity: decorativeIntensity)
         let glowRadius = 4.5 + (decorativeIntensity * 6.0)
+        let showsHints = overlayHints.isEmpty == false
 
         return ZStack {
             Capsule(style: .continuous)
@@ -262,28 +287,41 @@ struct RecordingOverlayView: View {
                     y: 0
                 )
 
-            HStack(spacing: 10) {
-                actionButton(
-                    systemName: "xmark",
-                    foreground: .white.opacity(0.92),
-                    background: Color.white.opacity(0.17)
-                ) {
-                    coordinator.cancelCaptureFromOverlay()
+            VStack(alignment: .leading, spacing: showsHints ? 8 : 0) {
+                HStack(spacing: 10) {
+                    actionButton(
+                        systemName: "xmark",
+                        foreground: .white.opacity(0.92),
+                        background: Color.white.opacity(0.17)
+                    ) {
+                        coordinator.cancelCaptureFromOverlay()
+                    }
+
+                    WaveformBars(samples: coordinator.audioLevelWindow)
+                        .frame(width: 42, height: 14)
+
+                    actionButton(
+                        systemName: "checkmark",
+                        foreground: .black.opacity(0.92),
+                        background: .white
+                    ) {
+                        coordinator.finalizeCaptureFromOverlay()
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
 
-                WaveformBars(samples: coordinator.audioLevelWindow)
-                    .frame(width: 42, height: 14)
-
-                actionButton(
-                    systemName: "checkmark",
-                    foreground: .black.opacity(0.92),
-                    background: .white
-                ) {
-                    coordinator.finalizeCaptureFromOverlay()
+                if showsHints {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(overlayHints, id: \.self) { hint in
+                                overlayHintChip(hint)
+                            }
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 9)
+            .padding(.vertical, showsHints ? 8 : 9)
         }
     }
 
@@ -333,6 +371,23 @@ struct RecordingOverlayView: View {
             .clipShape(Capsule(style: .continuous))
             .allowsHitTesting(false)
         }
+    }
+
+    private func overlayHintChip(_ hint: String) -> some View {
+        Text(hint)
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color.white.opacity(0.92))
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color.white.opacity(0.14))
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+            )
     }
 
     private var statusPill: some View {

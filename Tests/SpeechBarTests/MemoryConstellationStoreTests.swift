@@ -169,6 +169,95 @@ struct MemoryConstellationStoreTests {
         store.registerCompletedTranscriptPulse(second)
         #expect(store.capturePulseToken == 2)
     }
+
+    @Test
+    @MainActor
+    func reloadAfterTranscriptPulseSurfacesRecentlyAddedMemorySignals() async throws {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.recent.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let initialMemories = sampleMemories()
+        let addedMemory = MemoryItem(
+            id: UUID(),
+            type: .scene,
+            key: "scene:investor-sync",
+            valuePayload: Data("Investor Sync".utf8),
+            valueFingerprint: "Investor Sync",
+            identityHash: "scene|investor-sync",
+            scope: .app("com.apple.mail"),
+            confidence: 0.78,
+            status: .active,
+            createdAt: Date(timeIntervalSince1970: 101),
+            updatedAt: Date(timeIntervalSince1970: 101),
+            lastConfirmedAt: Date(timeIntervalSince1970: 101),
+            sourceEventIDs: [UUID()]
+        )
+        let catalog = MutableMemoryCatalog(memories: initialMemories)
+        let store = MemoryConstellationStore(
+            catalog: catalog,
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 120) })
+        )
+
+        await store.reload()
+        store.registerCompletedTranscriptPulse(
+            PublishedTranscript(text: "Hello", createdAt: Date(timeIntervalSince1970: 105))
+        )
+        await catalog.replaceMemories(initialMemories + [addedMemory])
+
+        await store.reload()
+
+        #expect(store.snapshot.statusPills.contains("本次新增 1 条"))
+        let scenesCluster = try #require(store.snapshot.clusters.first(where: { $0.kind == .scenes }))
+        #expect(scenesCluster.stars.contains(where: { $0.label == "Investor Sync" && $0.isRecentlyAdded }))
+    }
+
+    @Test
+    @MainActor
+    func hideSelectedMemoryMarksItHiddenAndClearsSelection() async throws {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.hide.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let memories = sampleMemories()
+        let catalog = MutableManagingMemoryCatalog(memories: memories)
+        let store = MemoryConstellationStore(
+            catalog: catalog,
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
+
+        await store.reload()
+        let selectedID = try #require(memories.first?.id)
+        store.focusStar(selectedID)
+
+        await store.hideSelectedMemory()
+
+        #expect(await catalog.hiddenIdentityHashes() == ["vocabulary|openai"])
+        #expect(store.selectedMemory == nil)
+        #expect(store.snapshot.clusters.reduce(0) { $0 + $1.itemCount } == 1)
+    }
+
+    @Test
+    @MainActor
+    func deleteSelectedMemoryMarksItDeletedAndClearsSelection() async throws {
+        let defaults = UserDefaults(suiteName: "MemoryConstellationStore.delete.\(UUID().uuidString)")!
+        let featureFlags = MemoryFeatureFlagStore(defaults: defaults)
+        let memories = sampleMemories()
+        let catalog = MutableManagingMemoryCatalog(memories: memories)
+        let store = MemoryConstellationStore(
+            catalog: catalog,
+            featureFlags: featureFlags,
+            builder: MemoryConstellationBuilder(now: { Date(timeIntervalSince1970: 100) })
+        )
+
+        await store.reload()
+        let selectedID = try #require(memories.last?.id)
+        store.focusStar(selectedID)
+
+        await store.deleteSelectedMemory()
+
+        #expect(await catalog.deletedIdentityHashes() == ["style|brevity"])
+        #expect(store.selectedMemory == nil)
+        #expect(store.snapshot.clusters.reduce(0) { $0 + $1.itemCount } == 1)
+    }
 }
 
 private struct InlineCatalogProvider: MemoryCatalogProviding {
@@ -176,6 +265,96 @@ private struct InlineCatalogProvider: MemoryCatalogProviding {
 
     func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
         memories
+    }
+}
+
+private actor MutableMemoryCatalog: MemoryCatalogProviding {
+    private var memories: [MemoryItem]
+
+    init(memories: [MemoryItem]) {
+        self.memories = memories
+    }
+
+    func replaceMemories(_ memories: [MemoryItem]) {
+        self.memories = memories
+    }
+
+    func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
+        memories.filter { memory in
+            query.statuses.contains(memory.status) && query.types.contains(memory.type)
+        }
+    }
+}
+
+private actor MutableManagingMemoryCatalog: MemoryCatalogProviding, MemoryCatalogManaging {
+    private var memories: [MemoryItem]
+    private var hidden: [String] = []
+    private var deleted: [String] = []
+
+    init(memories: [MemoryItem]) {
+        self.memories = memories
+    }
+
+    func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
+        memories.filter { memory in
+            query.statuses.contains(memory.status) && query.types.contains(memory.type)
+        }
+    }
+
+    func markHidden(identityHash: String, hiddenAt: Date) async throws {
+        hidden.append(identityHash)
+        memories = memories.map { memory in
+            guard memory.identityHash == identityHash else {
+                return memory
+            }
+            return MemoryItem(
+                id: memory.id,
+                type: memory.type,
+                key: memory.key,
+                valuePayload: memory.valuePayload,
+                valueFingerprint: memory.valueFingerprint,
+                identityHash: memory.identityHash,
+                scope: memory.scope,
+                confidence: memory.confidence,
+                status: .hidden,
+                createdAt: memory.createdAt,
+                updatedAt: hiddenAt,
+                lastConfirmedAt: memory.lastConfirmedAt,
+                sourceEventIDs: memory.sourceEventIDs
+            )
+        }
+    }
+
+    func markDeleted(identityHash: String, deletedAt: Date) async throws {
+        deleted.append(identityHash)
+        memories = memories.map { memory in
+            guard memory.identityHash == identityHash else {
+                return memory
+            }
+            return MemoryItem(
+                id: memory.id,
+                type: memory.type,
+                key: memory.key,
+                valuePayload: memory.valuePayload,
+                valueFingerprint: memory.valueFingerprint,
+                identityHash: memory.identityHash,
+                scope: memory.scope,
+                confidence: memory.confidence,
+                status: .deleted,
+                createdAt: memory.createdAt,
+                updatedAt: deletedAt,
+                lastConfirmedAt: memory.lastConfirmedAt,
+                sourceEventIDs: memory.sourceEventIDs
+            )
+        }
+    }
+
+    func hiddenIdentityHashes() -> [String] {
+        hidden
+    }
+
+    func deletedIdentityHashes() -> [String] {
+        deleted
     }
 }
 

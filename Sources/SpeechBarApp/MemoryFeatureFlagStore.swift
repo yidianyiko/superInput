@@ -13,7 +13,7 @@ final class MemoryFeatureFlagStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         self.captureEnabled = defaults.object(forKey: Keys.captureEnabled) as? Bool ?? true
-        self.recallEnabled = defaults.object(forKey: Keys.recallEnabled) as? Bool ?? false
+        self.recallEnabled = defaults.object(forKey: Keys.recallEnabled) as? Bool ?? true
         self.displayMode = MemoryConstellationDisplayMode(
             rawValue: defaults.string(forKey: Keys.displayMode) ?? ""
         ) ?? .full

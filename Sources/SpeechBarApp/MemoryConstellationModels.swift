@@ -90,6 +90,7 @@ struct MemoryConstellationStar: Identifiable, Equatable {
     let id: UUID
     let label: String
     let strength: Double
+    let isRecentlyAdded: Bool
 }
 
 struct MemoryConstellationBridge: Identifiable, Equatable {

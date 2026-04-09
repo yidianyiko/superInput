@@ -42,7 +42,17 @@ struct MemoryConstellationScreen: View {
             MemoryConstellationDetailPanelView(
                 memory: constellationStore.selectedMemory,
                 displayMode: memoryFeatureFlagStore.displayMode,
-                hasVisibleMemories: constellationStore.snapshot.clusters.isEmpty == false
+                hasVisibleMemories: constellationStore.snapshot.clusters.isEmpty == false,
+                hideSelectedMemory: {
+                    Task {
+                        await constellationStore.hideSelectedMemory()
+                    }
+                },
+                deleteSelectedMemory: {
+                    Task {
+                        await constellationStore.deleteSelectedMemory()
+                    }
+                }
             )
 
             MemoryConstellationRelationshipTrayView(

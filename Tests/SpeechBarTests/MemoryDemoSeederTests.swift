@@ -97,6 +97,8 @@ private actor InMemorySeedStore: MemoryStore {
         return filtered
     }
 
+    func markHidden(identityHash: String, hiddenAt: Date) async throws {}
+
     func markDeleted(identityHash: String, deletedAt: Date) async throws {}
 }
 

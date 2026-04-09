@@ -3,7 +3,7 @@ import MemoryDomain
 import MemoryExtraction
 import MemoryStorageSQLite
 
-public actor MemoryCoordinator: MemoryRetriever, MemoryEventRecording, MemoryCatalogProviding {
+public actor MemoryCoordinator: MemoryRetriever, MemoryEventRecording, MemoryCatalogProviding, MemoryCatalogManaging {
     private let store: any MemoryStore
     private let extractor: any MemoryExtractor
 
@@ -39,6 +39,14 @@ public actor MemoryCoordinator: MemoryRetriever, MemoryEventRecording, MemoryCat
 
     public func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
         try await store.listMemories(matching: query)
+    }
+
+    public func markHidden(identityHash: String, hiddenAt: Date) async throws {
+        try await store.markHidden(identityHash: identityHash, hiddenAt: hiddenAt)
+    }
+
+    public func markDeleted(identityHash: String, deletedAt: Date) async throws {
+        try await store.markDeleted(identityHash: identityHash, deletedAt: deletedAt)
     }
 
     private func compareRank(lhs: MemoryItem, rhs: MemoryItem) -> Bool {

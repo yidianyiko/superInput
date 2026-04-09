@@ -332,11 +332,15 @@ public struct SensitiveFieldClassifier: Sendable {
     }
 }
 
-public protocol MemoryStore: Sendable, MemoryCatalogProviding {
+public protocol MemoryCatalogManaging: Sendable {
+    func markHidden(identityHash: String, hiddenAt: Date) async throws
+    func markDeleted(identityHash: String, deletedAt: Date) async throws
+}
+
+public protocol MemoryStore: Sendable, MemoryCatalogProviding, MemoryCatalogManaging {
     func insert(event: InputEvent) async throws
     func upsert(memory: MemoryItem) async throws
     func listMemories(for request: RecallRequest) async throws -> [MemoryItem]
-    func markDeleted(identityHash: String, deletedAt: Date) async throws
 }
 
 public protocol MemoryExtractor: Sendable {

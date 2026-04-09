@@ -173,6 +173,38 @@ struct MemoryStorageSQLiteTests {
         #expect(rows[0].valueFingerprint == "OpenAI")
     }
 
+    @Test
+    func hiddenMemoriesAreExcludedFromDefaultCatalogButRemainQueryable() async throws {
+        let store = try makeTestStore()
+        let memory = MemoryItem(
+            id: UUID(),
+            type: .vocabulary,
+            key: "term:hidden-openai",
+            valuePayload: Data("OpenAI".utf8),
+            valueFingerprint: "OpenAI",
+            identityHash: "hidden-openai",
+            scope: .app("com.apple.mail"),
+            confidence: 0.80,
+            status: .active,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0),
+            lastConfirmedAt: Date(timeIntervalSince1970: 0),
+            sourceEventIDs: []
+        )
+
+        try await store.upsert(memory: memory)
+        try await store.markHidden(identityHash: memory.identityHash, hiddenAt: Date(timeIntervalSince1970: 2))
+
+        let activeRows = try await store.listMemories(matching: MemoryCenterQuery())
+        let hiddenRows = try await store.listMemories(
+            matching: MemoryCenterQuery(statuses: [.hidden], types: [.vocabulary])
+        )
+
+        #expect(activeRows.isEmpty)
+        #expect(hiddenRows.count == 1)
+        #expect(hiddenRows[0].status == .hidden)
+    }
+
     private func makeTestStore(now: Date = Date(timeIntervalSince1970: 0)) throws -> MemoryStorageSQLiteStore {
         try MemoryStorageSQLiteStore(
             databaseURL: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".sqlite"),

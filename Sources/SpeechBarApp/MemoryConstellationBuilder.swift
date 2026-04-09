@@ -13,7 +13,9 @@ struct MemoryConstellationBuilder {
         filter: MemoryConstellationClusterFilter,
         focus: MemoryConstellationFocus,
         viewMode: MemoryConstellationViewMode,
-        displayMode: MemoryConstellationDisplayMode
+        displayMode: MemoryConstellationDisplayMode,
+        recentlyAddedIdentityHashes: Set<String> = [],
+        recentCaptureCount: Int? = nil
     ) -> MemoryConstellationSnapshot {
         guard displayMode != .hidden else {
             return .hidden
@@ -27,7 +29,13 @@ struct MemoryConstellationBuilder {
             guard !items.isEmpty else {
                 return nil
             }
-            return makeCluster(kind: kind, items: items, displayMode: displayMode, focus: focus)
+            return makeCluster(
+                kind: kind,
+                items: items,
+                displayMode: displayMode,
+                focus: focus,
+                recentlyAddedIdentityHashes: recentlyAddedIdentityHashes
+            )
         }
 
         let bridges = buildBridges(from: filtered, displayMode: displayMode, focus: focus)
@@ -45,11 +53,12 @@ struct MemoryConstellationBuilder {
         return MemoryConstellationSnapshot(
             title: "我的记忆宇宙",
             subtitle: subtitle,
-            statusPills: [
+            statusPills: makeStatusPills(
+                recentCaptureCount: recentCaptureCount,
                 "本地保留 30 天",
                 "\(active.count) 条记忆",
                 displayMode == .privacySafe ? "隐私视图" : "记忆已开启"
-            ],
+            ),
             clusters: clusters,
             highlightedBridges: Array(bridges.prefix(2)),
             guidanceCards: guidanceCards,
@@ -143,7 +152,8 @@ struct MemoryConstellationBuilder {
         kind: MemoryConstellationClusterKind,
         items: [MemoryItem],
         displayMode: MemoryConstellationDisplayMode,
-        focus: MemoryConstellationFocus
+        focus: MemoryConstellationFocus,
+        recentlyAddedIdentityHashes: Set<String>
     ) -> MemoryConstellationCluster {
         let stars = items
             .sorted { lhs, rhs in
@@ -157,7 +167,8 @@ struct MemoryConstellationBuilder {
                 MemoryConstellationStar(
                     id: memory.id,
                     label: displayMode == .privacySafe ? "受保护记忆" : memory.valueFingerprint,
-                    strength: memory.confidence
+                    strength: memory.confidence,
+                    isRecentlyAdded: recentlyAddedIdentityHashes.contains(memory.identityHash)
                 )
             }
 
@@ -358,6 +369,13 @@ struct MemoryConstellationBuilder {
 
     private func clusterOrderIndex(for kind: MemoryConstellationClusterKind) -> Int {
         MemoryConstellationClusterKind.allCases.firstIndex(of: kind) ?? .max
+    }
+
+    private func makeStatusPills(recentCaptureCount: Int?, _ base: String...) -> [String] {
+        if let recentCaptureCount, recentCaptureCount > 0 {
+            return ["本次新增 \(recentCaptureCount) 条"] + base
+        }
+        return base
     }
 
     private func naturalLanguageList(_ items: [String]) -> String {

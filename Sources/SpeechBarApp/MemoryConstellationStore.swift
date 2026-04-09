@@ -18,6 +18,9 @@ final class MemoryConstellationStore: ObservableObject {
     private let builder: MemoryConstellationBuilder
     private var memories: [MemoryItem] = []
     private var lastPulsedTranscriptAt: Date?
+    private var awaitingCaptureDiff = false
+    private var recentCaptureCount: Int?
+    private var recentlyAddedIdentityHashes: Set<String> = []
 
     init(
         catalog: (any MemoryCatalogProviding)?,
@@ -36,6 +39,22 @@ final class MemoryConstellationStore: ObservableObject {
         } catch {
             liveMemories = []
         }
+
+        let previousActiveIdentityHashes = Set(memories.lazy.filter { $0.status == .active }.map(\.identityHash))
+        let nextActiveIdentityHashes = Set(liveMemories.lazy.filter { $0.status == .active }.map(\.identityHash))
+
+        if awaitingCaptureDiff {
+            let insertedIdentityHashes = nextActiveIdentityHashes.subtracting(previousActiveIdentityHashes)
+            recentlyAddedIdentityHashes = insertedIdentityHashes
+            recentCaptureCount = insertedIdentityHashes.isEmpty ? nil : insertedIdentityHashes.count
+            awaitingCaptureDiff = false
+        } else {
+            recentlyAddedIdentityHashes.formIntersection(nextActiveIdentityHashes)
+            if recentlyAddedIdentityHashes.isEmpty {
+                recentCaptureCount = nil
+            }
+        }
+
         memories = liveMemories
         reconcileSelection()
         rebuildSnapshot()
@@ -101,7 +120,36 @@ final class MemoryConstellationStore: ObservableObject {
         }
 
         lastPulsedTranscriptAt = transcript.createdAt
+        awaitingCaptureDiff = true
         capturePulseToken &+= 1
+    }
+
+    func hideSelectedMemory() async {
+        guard let manager = catalog as? any MemoryCatalogManaging,
+              let selectedMemory else {
+            return
+        }
+
+        do {
+            try await manager.markHidden(identityHash: selectedMemory.identityHash, hiddenAt: Date())
+            await reload()
+        } catch {
+            return
+        }
+    }
+
+    func deleteSelectedMemory() async {
+        guard let manager = catalog as? any MemoryCatalogManaging,
+              let selectedMemory else {
+            return
+        }
+
+        do {
+            try await manager.markDeleted(identityHash: selectedMemory.identityHash, deletedAt: Date())
+            await reload()
+        } catch {
+            return
+        }
     }
 
     private func rebuildSnapshot() {
@@ -110,7 +158,9 @@ final class MemoryConstellationStore: ObservableObject {
             filter: selectedFilter,
             focus: focus,
             viewMode: selectedViewMode,
-            displayMode: featureFlags.displayMode
+            displayMode: featureFlags.displayMode,
+            recentlyAddedIdentityHashes: recentlyAddedIdentityHashes,
+            recentCaptureCount: recentCaptureCount
         )
     }
 

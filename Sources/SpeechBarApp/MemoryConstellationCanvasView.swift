@@ -221,6 +221,14 @@ struct MemoryConstellationCanvasView: View {
                                 Circle()
                                     .stroke(constellationTheme.focusAccent.opacity(isSelected ? 0.95 : 0), lineWidth: 1.5)
                             )
+                            .overlay(
+                                Circle()
+                                    .stroke(constellationTheme.focusAccent.opacity(star.isRecentlyAdded ? 0.92 : 0), lineWidth: 1.4)
+                                    .frame(
+                                        width: starDiameter(star, selected: isSelected) + 8,
+                                        height: starDiameter(star, selected: isSelected) + 8
+                                    )
+                            )
                             .shadow(color: Color.white.opacity(isSelected ? 0.40 : (focused ? 0.32 : 0.18)), radius: isSelected ? 10 : (focused ? 7 : 3))
                             .scaleEffect(
                                 reduceMotion
@@ -233,6 +241,20 @@ struct MemoryConstellationCanvasView: View {
                                     ? (isSelected ? 1 : 0.88)
                                     : MemoryConstellationMotion.starOpacity(cluster: cluster.kind, starIndex: index, phase: phase)
                             )
+
+                        if star.isRecentlyAdded {
+                            Text("新")
+                                .font(.system(size: 8, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.black.opacity(0.82))
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(constellationTheme.focusAccent)
+                                )
+                                .offset(y: -(starDiameter(star, selected: isSelected) + 10))
+                                .accessibilityHidden(true)
+                        }
                     }
                 }
                 .buttonStyle(.plain)
@@ -240,7 +262,7 @@ struct MemoryConstellationCanvasView: View {
                     x: starPosition(index: index, around: anchor, radius: radius * 0.50).x + starOffset.width,
                     y: starPosition(index: index, around: anchor, radius: radius * 0.50).y + starOffset.height
                 )
-                .accessibilityLabel(Text(isSelected ? "\(star.label)，已选中" : star.label))
+                .accessibilityLabel(Text(accessibilityLabel(for: star, selected: isSelected)))
                 .accessibilityHint(Text("点按可查看这条真实记忆的详情。"))
             }
 
@@ -368,6 +390,12 @@ struct MemoryConstellationCanvasView: View {
             return nil
         }
         return id
+    }
+
+    private func accessibilityLabel(for star: MemoryConstellationStar, selected: Bool) -> String {
+        let selection = selected ? "，已选中" : ""
+        let recent = star.isRecentlyAdded ? "，刚新增" : ""
+        return "\(star.label)\(recent)\(selection)"
     }
 
     private func ambientX(for index: Int) -> CGFloat {

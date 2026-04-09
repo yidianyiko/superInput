@@ -8,6 +8,8 @@ struct MemoryConstellationDetailPanelView: View {
     let memory: MemoryItem?
     let displayMode: MemoryConstellationDisplayMode
     let hasVisibleMemories: Bool
+    let hideSelectedMemory: () -> Void
+    let deleteSelectedMemory: () -> Void
 
     var body: some View {
         MemoryConstellationPanel(padding: 18) {
@@ -64,6 +66,10 @@ struct MemoryConstellationDetailPanelView: View {
             detailRow(title: "内部键", value: memory.key)
             detailRow(title: "最近更新", value: Self.timestampFormatter.string(from: memory.updatedAt))
             detailRow(title: "关联事件", value: "\(memory.sourceEventIDs.count) 个")
+            HStack(spacing: 10) {
+                actionButton(title: "隐藏", tint: constellationTheme.secondaryText, action: hideSelectedMemory)
+                actionButton(title: "删除", tint: Color(red: 0.88, green: 0.42, blue: 0.36), action: deleteSelectedMemory)
+            }
         }
     }
 
@@ -95,6 +101,25 @@ struct MemoryConstellationDetailPanelView: View {
                 .foregroundStyle(constellationTheme.primaryText)
                 .textSelection(.enabled)
         }
+    }
+
+    private func actionButton(title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(constellationTheme.secondarySurfaceFill.opacity(0.92))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(tint.opacity(0.22), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     private func primaryValue(for memory: MemoryItem) -> String {
