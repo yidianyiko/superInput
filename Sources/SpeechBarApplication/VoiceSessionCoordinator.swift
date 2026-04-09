@@ -39,6 +39,8 @@ public final class VoiceSessionCoordinator: ObservableObject {
     @Published public private(set) var audioLevelWindow: [AudioLevelSample] = []
     @Published public private(set) var activeInputHints: [String] = []
 
+    public let publishFeedbackNotifier: TranscriptPublishFeedbackNotifier
+
     private let hardwareSource: any HardwareEventSource
     private let audioInputSource: any AudioInputSource
     private let transcriptionClient: any TranscriptionClient
@@ -70,6 +72,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private var activeSessionID: UUID?
     private var activeSessionStartedAt: Date?
     private var activeFinalizeStartedAt: Date?
+    private var activePublishFeedbackID: UUID?
     private var shouldFinalizeWhenReady = false
     private var isCompletingActiveSession = false
     private var finalSegments: [String] = []
@@ -82,6 +85,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         transcriptionClient: any TranscriptionClient,
         credentialProvider: any CredentialProvider,
         transcriptPublisher: any TranscriptPublisher,
+        publishFeedbackNotifier: TranscriptPublishFeedbackNotifier = TranscriptPublishFeedbackNotifier(),
         windowSwitcher: (any WindowSwitching)? = nil,
         returnKeyHandler: @escaping @Sendable () -> Void = {
             guard let source = CGEventSource(stateID: .combinedSessionState)
@@ -115,6 +119,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         self.transcriptionClient = transcriptionClient
         self.credentialProvider = credentialProvider
         self.transcriptPublisher = transcriptPublisher
+        self.publishFeedbackNotifier = publishFeedbackNotifier
         self.windowSwitcher = windowSwitcher
         self.returnKeyHandler = returnKeyHandler
         self.transcriptTargetCapturer = transcriptTargetCapturer
@@ -524,16 +529,43 @@ public final class VoiceSessionCoordinator: ObservableObject {
             let endedAt = activeFinalizeStartedAt ?? completedAt
             return max(0, endedAt.timeIntervalSince(startedAt))
         }
+        let publishFeedbackID = UUID()
+        activePublishFeedbackID = publishFeedbackID
         let deliveryOutcome: TranscriptDeliveryOutcome
         do {
             overlayPhase = .publishing
             overlaySubtitle = "Pasting"
+            publishFeedbackNotifier.notify(
+                .started(
+                    TranscriptPublishFeedbackStart(
+                        publishID: publishFeedbackID,
+                        transcript: publishedTranscript
+                    )
+                )
+            )
             let publishStartedAt = Date()
             deliveryOutcome = try await transcriptPublisher.publish(publishedTranscript)
+            publishFeedbackNotifier.notify(
+                .completed(
+                    TranscriptPublishFeedbackCompletion(
+                        publishID: publishFeedbackID,
+                        outcome: deliveryOutcome
+                    )
+                )
+            )
+            activePublishFeedbackID = nil
             performanceLog(
                 "publish finished, publishLatency=\(String(format: "%.3f", Date().timeIntervalSince(publishStartedAt)))s"
             )
         } catch {
+            if let activePublishFeedbackID {
+                publishFeedbackNotifier.notify(
+                    .failed(
+                        TranscriptPublishFeedbackFailure(publishID: activePublishFeedbackID)
+                    )
+                )
+            }
+            self.activePublishFeedbackID = nil
             await teardownActiveSession()
             sessionState = .idle
             overlayPhase = .hidden
@@ -601,6 +633,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeSessionID = nil
         activeSessionStartedAt = nil
         activeFinalizeStartedAt = nil
+        activePublishFeedbackID = nil
         activeRecallBundle = nil
         audioLevelWindow = []
         lastAudioLevelWindowUpdateAt = nil

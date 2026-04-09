@@ -74,6 +74,7 @@ private struct AppDependencies {
     let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
     let statusBarController: StatusBarController
     let recordingOverlayController: RecordingOverlayController
+    let transcriptInjectionOverlayController: TranscriptInjectionOverlayController
     let windowSwitchOverlayController: WindowSwitchOverlayController
     let speechProviderObservation: AnyCancellable
 
@@ -312,6 +313,10 @@ private struct AppDependencies {
             memoryFeatureFlagStore: memoryFeatureFlagStore
         )
         self.recordingOverlayController = RecordingOverlayController(coordinator: coordinator)
+        self.transcriptInjectionOverlayController = TranscriptInjectionOverlayController(
+            coordinator: coordinator,
+            targetProvider: focusedTextTranscriptPublisher
+        )
         self.windowSwitchOverlayController = WindowSwitchOverlayController(store: windowSwitchOverlayStore)
 
         if modelSettingsStore.isFreshInstall && localWhisperModelStore.shouldShowInstallPrompt {

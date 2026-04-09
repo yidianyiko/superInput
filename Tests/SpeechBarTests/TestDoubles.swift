@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import MemoryDomain
 import SpeechBarDomain
@@ -145,14 +146,22 @@ struct MockCredentialProvider: CredentialProvider {
 actor MockTranscriptPublisher: TranscriptPublisher {
     private(set) var published: [PublishedTranscript] = []
     var outcome: TranscriptDeliveryOutcome = .publishedOnly
+    var error: Error?
 
     func publish(_ transcript: PublishedTranscript) async throws -> TranscriptDeliveryOutcome {
+        if let error {
+            throw error
+        }
         published.append(transcript)
         return outcome
     }
 
     func setOutcome(_ outcome: TranscriptDeliveryOutcome) {
         self.outcome = outcome
+    }
+
+    func setError(_ error: Error?) {
+        self.error = error
     }
 
     func snapshot() -> [PublishedTranscript] {
@@ -234,6 +243,28 @@ struct MockFocusedInputSnapshotProvider: FocusedInputSnapshotProviding {
 
     func observedTextAfterPublish() async -> String? {
         observedText
+    }
+}
+
+struct MockTranscriptInjectionTargetSnapshotProvider: TranscriptInjectionTargetSnapshotProviding {
+    var snapshot: TranscriptInjectionTargetSnapshot?
+
+    init(
+        snapshot: TranscriptInjectionTargetSnapshot? = TranscriptInjectionTargetSnapshot(
+            processIdentifier: 4242,
+            appIdentifier: "com.apple.TextEdit",
+            appName: "TextEdit",
+            screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+            windowFrame: CGRect(x: 180, y: 160, width: 820, height: 520),
+            elementFrame: CGRect(x: 260, y: 260, width: 360, height: 44),
+            destinationPoint: CGPoint(x: 440, y: 282)
+        )
+    ) {
+        self.snapshot = snapshot
+    }
+
+    func currentTranscriptInjectionTargetSnapshot() async -> TranscriptInjectionTargetSnapshot? {
+        snapshot
     }
 }
 
