@@ -4,13 +4,11 @@ import SQLite3
 
 public actor MemoryStorageSQLiteStore: MemoryStore {
     private static let retentionInterval: TimeInterval = 30 * 24 * 60 * 60
-    private static let memorySelectSQL = """
+    private static let memorySelectColumnsSQL = """
         SELECT identity_hash, id, type, memory_key, value_payload, value_fingerprint,
                scope_kind, scope_app_identifier, scope_window_title, scope_field_role,
-               scope_field_label, confidence, status, created_at, updated_at,
-               last_confirmed_at, source_event_ids
+               scope_field_label, confidence, status, created_at, updated_at, last_confirmed_at, source_event_ids
         FROM memories
-        ORDER BY updated_at DESC;
         """
 
     private let databaseURL: URL
@@ -116,21 +114,34 @@ public actor MemoryStorageSQLiteStore: MemoryStore {
     }
 
     public func listMemories(matching query: MemoryCenterQuery) async throws -> [MemoryItem] {
-        let rows: [MemoryItem] = try self.query(Self.memorySelectSQL, bind: { _ in }) { statement in
-            let memory = try decodeMemory(from: statement)
-            guard query.statuses.contains(memory.status) else {
-                return nil
-            }
-            guard query.types.contains(memory.type) else {
-                return nil
-            }
-            return memory
+        guard query.statuses.isEmpty == false, query.types.isEmpty == false else {
+            return []
         }
 
-        if let limit = query.limit {
-            return Array(rows.prefix(limit))
+        if let limit = query.limit, limit <= 0 {
+            return []
         }
-        return rows
+
+        let selectStatement = Self.makeMemorySelectStatement(for: query)
+        return try self.query(selectStatement.sql) { statement in
+            var bindIndex: Int32 = 1
+
+            for status in selectStatement.statuses {
+                bindText(status.rawValue, to: statement, at: bindIndex)
+                bindIndex += 1
+            }
+
+            for type in selectStatement.types {
+                bindText(type.rawValue, to: statement, at: bindIndex)
+                bindIndex += 1
+            }
+
+            if let limit = selectStatement.limit {
+                sqlite3_bind_int64(statement, bindIndex, sqlite3_int64(limit))
+            }
+        } rowDecoder: { statement in
+            try decodeMemory(from: statement)
+        }
     }
 
     public func listMemories(for request: RecallRequest) async throws -> [MemoryItem] {
@@ -254,6 +265,34 @@ public actor MemoryStorageSQLiteStore: MemoryStore {
                 ? nil
                 : Date(timeIntervalSince1970: sqlite3_column_double(statement, 15)),
             sourceEventIDs: sourceEventIDs
+        )
+    }
+
+    private static func makeMemorySelectStatement(for query: MemoryCenterQuery) -> MemorySelectStatement {
+        let statuses = query.statuses.sorted { $0.rawValue < $1.rawValue }
+        let types = query.types.sorted { $0.rawValue < $1.rawValue }
+
+        let statusPlaceholders = Array(repeating: "?", count: statuses.count).joined(separator: ", ")
+        let typePlaceholders = Array(repeating: "?", count: types.count).joined(separator: ", ")
+
+        var sql = """
+        \(memorySelectColumnsSQL)
+        WHERE status IN (\(statusPlaceholders))
+          AND type IN (\(typePlaceholders))
+        ORDER BY updated_at DESC
+        """
+
+        if query.limit != nil {
+            sql += "\nLIMIT ?"
+        }
+
+        sql += ";"
+
+        return MemorySelectStatement(
+            sql: sql,
+            statuses: statuses,
+            types: types,
+            limit: query.limit
         )
     }
 
@@ -510,6 +549,13 @@ public actor MemoryStorageSQLiteStore: MemoryStore {
     private func lastErrorMessage() -> String {
         String(cString: sqlite3_errmsg(db))
     }
+}
+
+private struct MemorySelectStatement {
+    let sql: String
+    let statuses: [MemoryStatus]
+    let types: [MemoryType]
+    let limit: Int?
 }
 
 private struct ScopeRecord {

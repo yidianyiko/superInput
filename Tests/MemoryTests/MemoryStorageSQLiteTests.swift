@@ -2,6 +2,7 @@ import Foundation
 import Testing
 import MemoryDomain
 import MemoryExtraction
+import SQLite3
 @testable import MemoryStorageSQLite
 
 @Suite("MemoryStorageSQLite")
@@ -205,12 +206,105 @@ struct MemoryStorageSQLiteTests {
         #expect(hiddenRows[0].status == .hidden)
     }
 
+    @Test
+    func catalogQueryIgnoresCorruptRowsOutsideRequestedFilters() async throws {
+        let context = try makeTestStoreContext()
+
+        try await context.store.upsert(memory: MemoryItem(
+            id: UUID(),
+            type: .vocabulary,
+            key: "term:visible-openai",
+            valuePayload: Data("OpenAI".utf8),
+            valueFingerprint: "OpenAI",
+            identityHash: "visible-openai",
+            scope: .app("com.apple.mail"),
+            confidence: 0.80,
+            status: .active,
+            createdAt: Date(timeIntervalSince1970: 0),
+            updatedAt: Date(timeIntervalSince1970: 0),
+            lastConfirmedAt: Date(timeIntervalSince1970: 0),
+            sourceEventIDs: []
+        ))
+
+        try insertCorruptMemoryRow(
+            databaseURL: context.databaseURL,
+            identityHash: "hidden-corrupt-scene",
+            type: .scene,
+            status: .hidden,
+            updatedAt: Date(timeIntervalSince1970: 10)
+        )
+
+        let rows = try await context.store.listMemories(
+            matching: MemoryCenterQuery(
+                statuses: [.active],
+                types: [.vocabulary],
+                limit: 1
+            )
+        )
+
+        #expect(rows.count == 1)
+        #expect(rows[0].identityHash == "visible-openai")
+    }
+
     private func makeTestStore(now: Date = Date(timeIntervalSince1970: 0)) throws -> MemoryStorageSQLiteStore {
-        try MemoryStorageSQLiteStore(
-            databaseURL: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".sqlite"),
+        try makeTestStoreContext(now: now).store
+    }
+
+    private func makeTestStoreContext(
+        now: Date = Date(timeIntervalSince1970: 0)
+    ) throws -> (store: MemoryStorageSQLiteStore, databaseURL: URL) {
+        let databaseURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + ".sqlite")
+        let store = try MemoryStorageSQLiteStore(
+            databaseURL: databaseURL,
             keyProvider: StaticMemoryKeyProvider(),
             now: { now }
         )
+        return (store, databaseURL)
+    }
+
+    private func insertCorruptMemoryRow(
+        databaseURL: URL,
+        identityHash: String,
+        type: MemoryType,
+        status: MemoryStatus,
+        updatedAt: Date
+    ) throws {
+        var handle: OpaquePointer?
+        guard sqlite3_open(databaseURL.path, &handle) == SQLITE_OK, let handle else {
+            throw CorruptMemoryInsertError.openFailed
+        }
+        defer { sqlite3_close(handle) }
+
+        let sql = """
+        INSERT INTO memories (
+            identity_hash, id, type, memory_key, value_payload, value_fingerprint,
+            scope_kind, scope_app_identifier, scope_window_title, scope_field_role,
+            scope_field_label, confidence, status, created_at, updated_at,
+            last_confirmed_at, source_event_ids
+        ) VALUES (
+            '\(identityHash)',
+            '\(UUID().uuidString)',
+            '\(type.rawValue)',
+            'corrupt:\(identityHash)',
+            X'00',
+            'corrupt',
+            'app',
+            'com.apple.mail',
+            NULL,
+            NULL,
+            NULL,
+            0.10,
+            '\(status.rawValue)',
+            0,
+            \(updatedAt.timeIntervalSince1970),
+            NULL,
+            X'5B5D'
+        );
+        """
+
+        guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else {
+            throw CorruptMemoryInsertError.insertFailed(String(cString: sqlite3_errmsg(handle)))
+        }
     }
 
     private func staleObservedEvent() -> InputEvent {
@@ -280,4 +374,9 @@ private struct StaticMemoryKeyProvider: MemoryKeyProviding {
     func loadOrCreateMasterKey() throws -> Data {
         Data(repeating: 0x2A, count: 32)
     }
+}
+
+private enum CorruptMemoryInsertError: Error {
+    case openFailed
+    case insertFailed(String)
 }
