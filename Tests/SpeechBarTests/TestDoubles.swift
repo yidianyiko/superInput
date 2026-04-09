@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import MemoryDomain
+@testable import SpeechBarInfrastructure
 import SpeechBarDomain
 
 final class MockHardwareEventSource: HardwareEventSource, @unchecked Sendable {
@@ -17,6 +18,58 @@ final class MockHardwareEventSource: HardwareEventSource, @unchecked Sendable {
 
     func send(_ event: HardwareEvent) {
         continuation.yield(event)
+    }
+}
+
+final class MockRecordingHotkeyRuntimeSource: RecordingHotkeyRuntimeSource, @unchecked Sendable {
+    let events: AsyncStream<HardwareEvent>
+    let diagnosticsUpdates: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>
+    let requiresAccessibility: Bool
+
+    private let eventsContinuation: AsyncStream<HardwareEvent>.Continuation
+    private let diagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation
+
+    private(set) var diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot
+    private(set) var shutdownCallCount = 0
+    private var isShutdown = false
+
+    init(
+        diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot,
+        requiresAccessibility: Bool? = nil
+    ) {
+        var capturedEventsContinuation: AsyncStream<HardwareEvent>.Continuation?
+        self.events = AsyncStream { continuation in
+            capturedEventsContinuation = continuation
+        }
+        self.eventsContinuation = capturedEventsContinuation!
+
+        var capturedDiagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation?
+        self.diagnosticsUpdates = AsyncStream { continuation in
+            capturedDiagnosticsContinuation = continuation
+        }
+        self.diagnosticsContinuation = capturedDiagnosticsContinuation!
+        self.diagnosticsSnapshot = diagnosticsSnapshot
+        self.requiresAccessibility = requiresAccessibility ?? diagnosticsSnapshot.requiresAccessibility
+        self.diagnosticsContinuation.yield(diagnosticsSnapshot)
+    }
+
+    func send(_ event: HardwareEvent) {
+        guard !isShutdown else { return }
+        eventsContinuation.yield(event)
+    }
+
+    func updateDiagnostics(_ diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot) {
+        guard !isShutdown else { return }
+        self.diagnosticsSnapshot = diagnosticsSnapshot
+        diagnosticsContinuation.yield(diagnosticsSnapshot)
+    }
+
+    func shutdown() {
+        shutdownCallCount += 1
+        guard !isShutdown else { return }
+        isShutdown = true
+        eventsContinuation.finish()
+        diagnosticsContinuation.finish()
     }
 }
 

@@ -17,10 +17,17 @@ private func debugLog(_ message: String) {
     }
 }
 
-public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unchecked Sendable {
+public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, RecordingHotkeyRuntimeSource, @unchecked Sendable {
     public let events: AsyncStream<HardwareEvent>
+    let diagnosticsUpdates: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>
+    let requiresAccessibility = true
+
+    public var diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot {
+        stateQueue.sync { diagnosticsSnapshotStorage }
+    }
 
     private let continuation: AsyncStream<HardwareEvent>.Continuation
+    private let diagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation
     private let stateQueue = DispatchQueue(label: "com.startup.speechbar.right-command")
 
     private var eventTap: CFMachPort?
@@ -29,10 +36,14 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
     private var isRightCommandDown = false
     private var isLeftCommandDown = false
     private var isRecordingToggledOn = false
+    private var isShutdown = false
+    private var diagnosticsSnapshotStorage: RecordingHotkeyDiagnosticsSnapshot
 
     private static let rightCommandKeyCode: CGKeyCode = 54
     private static let leftCommandKeyCode: CGKeyCode = 55
     private static let syntheticMarker: Int64 = 0x53504253
+    private static let permissionGuidance = "Grant Accessibility access to use the right Command hotkey."
+    private static let registrationFailureGuidance = "The right Command hotkey listener could not be installed."
 
     public init() {
         var capturedContinuation: AsyncStream<HardwareEvent>.Continuation?
@@ -41,12 +52,50 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
         }
         self.continuation = capturedContinuation!
 
+        var capturedDiagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation?
+        self.diagnosticsUpdates = AsyncStream { continuation in
+            capturedDiagnosticsContinuation = continuation
+        }
+        self.diagnosticsContinuation = capturedDiagnosticsContinuation!
+
+        let accessibilityTrusted = AXIsProcessTrusted()
+        self.diagnosticsSnapshotStorage = Self.makeDiagnosticsSnapshot(
+            registrationStatus: accessibilityTrusted ? .registrationFailed : .permissionRequired,
+            accessibilityTrusted: accessibilityTrusted,
+            guidanceText: accessibilityTrusted ? Self.registrationFailureGuidance : Self.permissionGuidance
+        )
+        diagnosticsContinuation.yield(diagnosticsSnapshotStorage)
+
         promptForAccessibilityIfNeeded()
         installEventTapIfPossible()
     }
 
     deinit {
-        installRetryTimer?.invalidate()
+        shutdown()
+    }
+
+    func shutdown() {
+        let (timer, runLoopSource, eventTap, shouldShutdown): (Timer?, CFRunLoopSource?, CFMachPort?, Bool) = stateQueue.sync {
+            guard !isShutdown else {
+                return (nil, nil, nil, false)
+            }
+            isShutdown = true
+
+            let timer = installRetryTimer
+            installRetryTimer = nil
+
+            let runLoopSource = self.runLoopSource
+            self.runLoopSource = nil
+
+            let eventTap = self.eventTap
+            self.eventTap = nil
+
+            return (timer, runLoopSource, eventTap, true)
+        }
+
+        guard shouldShutdown else { return }
+
+        timer?.invalidate()
 
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
@@ -55,15 +104,26 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
         if let eventTap {
             CFMachPortInvalidate(eventTap)
         }
+
+        continuation.finish()
+        diagnosticsContinuation.finish()
     }
 
     private func installEventTapIfPossible() {
+        let shouldContinue = stateQueue.sync { !isShutdown }
+        guard shouldContinue else { return }
+
         guard eventTap == nil else {
             cancelInstallRetry()
             return
         }
 
         guard AXIsProcessTrusted() else {
+            updateDiagnostics(
+                registrationStatus: .permissionRequired,
+                accessibilityTrusted: false,
+                guidanceText: Self.permissionGuidance
+            )
             scheduleInstallRetry()
             return
         }
@@ -79,6 +139,11 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
             NSLog("SlashVibe: failed to create right-command event tap.")
+            updateDiagnostics(
+                registrationStatus: .registrationFailed,
+                accessibilityTrusted: true,
+                guidanceText: Self.registrationFailureGuidance
+            )
             scheduleInstallRetry()
             return
         }
@@ -90,6 +155,11 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: eventTap, enable: true)
         cancelInstallRetry()
+        updateDiagnostics(
+            registrationStatus: .registered,
+            accessibilityTrusted: true,
+            guidanceText: nil
+        )
     }
 
     private func scheduleInstallRetry() {
@@ -109,6 +179,41 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
             kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
         ] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    private func updateDiagnostics(
+        registrationStatus: RecordingHotkeyRegistrationStatus,
+        accessibilityTrusted: Bool,
+        guidanceText: String?
+    ) {
+        let snapshot = Self.makeDiagnosticsSnapshot(
+            registrationStatus: registrationStatus,
+            accessibilityTrusted: accessibilityTrusted,
+            guidanceText: guidanceText
+        )
+
+        let shouldYield = stateQueue.sync { () -> Bool in
+            guard !isShutdown else { return false }
+            diagnosticsSnapshotStorage = snapshot
+            return true
+        }
+        guard shouldYield else { return }
+        diagnosticsContinuation.yield(snapshot)
+    }
+
+    private static func makeDiagnosticsSnapshot(
+        registrationStatus: RecordingHotkeyRegistrationStatus,
+        accessibilityTrusted: Bool,
+        guidanceText: String?
+    ) -> RecordingHotkeyDiagnosticsSnapshot {
+        RecordingHotkeyDiagnosticsSnapshot(
+            configuration: .defaultRightCommand,
+            registrationStatus: registrationStatus,
+            requiresAccessibility: true,
+            accessibilityTrusted: accessibilityTrusted,
+            lastTrigger: nil,
+            guidanceText: guidanceText
+        )
     }
 
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, userInfo in
@@ -166,6 +271,7 @@ public final class GlobalRightCommandPushToTalkSource: HardwareEventSource, @unc
         let rightCommandIsDown = event.flags.contains(.maskCommand)
 
         stateQueue.sync(execute: {
+            guard !isShutdown else { return }
             if rightCommandIsDown {
                 guard !isLeftCommandDown else { return }
                 guard !isRightCommandDown else { return }
