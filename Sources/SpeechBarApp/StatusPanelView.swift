@@ -17,6 +17,12 @@ struct StatusPanelView: View {
     let openHomeAction: (() -> Void)?
 
     static let defaultThemeRawValue = HomeWindowStore.ThemePreset.green.rawValue
+    static let triggerCardHeight: CGFloat = 72
+    static let triggerCardHorizontalPadding: CGFloat = 14
+    static let triggerCardVerticalPadding: CGFloat = 8
+    static let triggerCardContentSpacing: CGFloat = 6
+    static let triggerCardTextSpacing: CGFloat = 2
+    static let triggerChipVerticalPadding: CGFloat = 4
 
     @AppStorage("home.selectedTheme") private var selectedThemeRaw = Self.defaultThemeRawValue
     @State private var apiKeyInput = ""
@@ -137,12 +143,12 @@ struct StatusPanelView: View {
                         )
                 )
                 .overlay {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Self.triggerCardContentSpacing) {
                         HStack {
                             Text(isRecordingFlowActive ? "Live" : "Ready")
                                 .font(.system(size: 10, weight: .bold, design: .rounded))
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 5)
+                                .padding(.vertical, Self.triggerChipVerticalPadding)
                                 .background(palette.controlFill, in: Capsule())
                                 .foregroundStyle(palette.controlText)
                             Spacer()
@@ -150,7 +156,7 @@ struct StatusPanelView: View {
                                 .font(.system(size: 22, weight: .bold))
                         }
 
-                        VStack(spacing: 4) {
+                        VStack(spacing: Self.triggerCardTextSpacing) {
                             Text(recordButtonTitle)
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                             Text(recordButtonSubtitle)
@@ -160,14 +166,14 @@ struct StatusPanelView: View {
                         }
                     }
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, Self.triggerCardHorizontalPadding)
+                    .padding(.vertical, Self.triggerCardVerticalPadding)
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(palette.controlStroke, lineWidth: 1)
                 )
-                .frame(height: 106)
+                .frame(height: Self.triggerCardHeight)
                 .opacity(isActionDisabled ? 0.55 : 1.0)
         }
         .buttonStyle(.plain)

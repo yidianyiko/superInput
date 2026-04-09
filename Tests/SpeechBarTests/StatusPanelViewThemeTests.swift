@@ -70,6 +70,20 @@ struct StatusPanelViewThemeTests {
     }
 }
 
+@Suite("StatusPanelViewTrigger")
+struct StatusPanelViewTriggerTests {
+    @Test
+    @MainActor
+    func triggerCardUsesCompactMetrics() {
+        #expect(StatusPanelView.triggerCardHeight == 72)
+        #expect(StatusPanelView.triggerCardHorizontalPadding == 14)
+        #expect(StatusPanelView.triggerCardVerticalPadding == 8)
+        #expect(StatusPanelView.triggerCardContentSpacing == 6)
+        #expect(StatusPanelView.triggerCardTextSpacing == 2)
+        #expect(StatusPanelView.triggerChipVerticalPadding == 4)
+    }
+}
+
 @MainActor
 private func makeStatusPanelDependencies(defaults: UserDefaults) -> StatusPanelViewTestDependencies {
     let diagnosticsDirectory = FileManager.default.temporaryDirectory
