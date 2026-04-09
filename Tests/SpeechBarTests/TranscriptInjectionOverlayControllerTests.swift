@@ -175,6 +175,136 @@ struct TranscriptInjectionOverlayControllerTests {
         #expect(controller.activePublishIDForTesting == nil)
         #expect(controller.panelIsVisibleForTesting == false)
     }
+
+    @Test
+    @MainActor
+    func mismatchedFailedDoesNotHideActiveOverlay() async throws {
+        let dependencies = makeTranscriptInjectionOverlayDependencies()
+        let controller = TranscriptInjectionOverlayController(
+            coordinator: dependencies.coordinator,
+            targetProvider: dependencies.targetProvider,
+            visibleDuration: .seconds(10)
+        )
+        let activePublishID = UUID()
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: activePublishID,
+                    transcript: PublishedTranscript(text: "ni hao")
+                )
+            )
+        )
+
+        try await eventually {
+            controller.activePublishIDForTesting == activePublishID
+        }
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .failed(
+                TranscriptPublishFeedbackFailure(
+                    publishID: UUID()
+                )
+            )
+        )
+
+        try await Task.sleep(for: .milliseconds(150))
+
+        #expect(controller.activePublishIDForTesting == activePublishID)
+        #expect(controller.panelIsVisibleForTesting)
+    }
+
+    @Test
+    @MainActor
+    func mismatchedPublishedOnlyCompletionDoesNotHideActiveOverlay() async throws {
+        let dependencies = makeTranscriptInjectionOverlayDependencies()
+        let controller = TranscriptInjectionOverlayController(
+            coordinator: dependencies.coordinator,
+            targetProvider: dependencies.targetProvider,
+            visibleDuration: .seconds(10)
+        )
+        let activePublishID = UUID()
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: activePublishID,
+                    transcript: PublishedTranscript(text: "ni hao")
+                )
+            )
+        )
+
+        try await eventually {
+            controller.activePublishIDForTesting == activePublishID
+        }
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .completed(
+                TranscriptPublishFeedbackCompletion(
+                    publishID: UUID(),
+                    outcome: .publishedOnly
+                )
+            )
+        )
+
+        try await Task.sleep(for: .milliseconds(150))
+
+        #expect(controller.activePublishIDForTesting == activePublishID)
+        #expect(controller.panelIsVisibleForTesting)
+    }
+
+    @Test
+    @MainActor
+    func rapidPublishedOnlyHideThenRestartKeepsNewOverlayVisibleAfterFadeWindow() async throws {
+        let dependencies = makeTranscriptInjectionOverlayDependencies()
+        let controller = TranscriptInjectionOverlayController(
+            coordinator: dependencies.coordinator,
+            targetProvider: dependencies.targetProvider,
+            visibleDuration: .seconds(10)
+        )
+        let firstPublishID = UUID()
+        let secondPublishID = UUID()
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: firstPublishID,
+                    transcript: PublishedTranscript(text: "ni hao")
+                )
+            )
+        )
+
+        try await eventually {
+            controller.activePublishIDForTesting == firstPublishID
+        }
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .completed(
+                TranscriptPublishFeedbackCompletion(
+                    publishID: firstPublishID,
+                    outcome: .publishedOnly
+                )
+            )
+        )
+
+        dependencies.coordinator.publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: secondPublishID,
+                    transcript: PublishedTranscript(text: "hello again")
+                )
+            )
+        )
+
+        try await eventually {
+            controller.activePublishIDForTesting == secondPublishID
+        }
+
+        try await Task.sleep(for: .milliseconds(150))
+
+        #expect(controller.activePublishIDForTesting == secondPublishID)
+        #expect(controller.panelIsVisibleForTesting)
+    }
 }
 
 @MainActor

@@ -12,6 +12,7 @@ final class TranscriptInjectionOverlayController: NSObject {
     private let visibleDuration: Duration
     private var feedbackTask: Task<Void, Never>?
     private var scheduledHideTask: Task<Void, Never>?
+    private var panelVisibilityGeneration: UInt = 0
 
     init(
         coordinator: VoiceSessionCoordinator,
@@ -86,16 +87,22 @@ final class TranscriptInjectionOverlayController: NSObject {
             scheduleHide(for: start.publishID)
 
         case .completed(let completion):
+            let isActivePublish = store.activePublishID == completion.publishID
             store.complete(
                 publishID: completion.publishID,
                 outcome: completion.outcome
             )
 
-            if completion.outcome == .publishedOnly {
+            if isActivePublish, completion.outcome == .publishedOnly {
+                scheduledHideTask?.cancel()
+                scheduledHideTask = nil
                 hidePanel()
             }
 
         case .failed(let failure):
+            guard store.activePublishID == failure.publishID else {
+                return
+            }
             scheduledHideTask?.cancel()
             scheduledHideTask = nil
             store.clear(publishID: failure.publishID)
@@ -127,6 +134,7 @@ final class TranscriptInjectionOverlayController: NSObject {
     }
 
     private func showPanel() {
+        invalidatePanelVisibilityGeneration()
         if !panel.isVisible {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
@@ -135,22 +143,33 @@ final class TranscriptInjectionOverlayController: NSObject {
                 panel.animator().alphaValue = 1
             }
         } else {
+            panel.alphaValue = 1
             panel.orderFrontRegardless()
         }
     }
 
     private func hidePanel() {
         guard panel.isVisible else { return }
+        let generation = invalidatePanelVisibilityGeneration()
 
         NSAnimationContext.runAnimationGroup({ context in
             context.duration = 0.10
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             Task { @MainActor in
-                self?.panel.orderOut(nil)
-                self?.panel.alphaValue = 1
+                guard let self, self.panelVisibilityGeneration == generation else {
+                    return
+                }
+                self.panel.orderOut(nil)
+                self.panel.alphaValue = 1
             }
         })
+    }
+
+    @discardableResult
+    private func invalidatePanelVisibilityGeneration() -> UInt {
+        panelVisibilityGeneration &+= 1
+        return panelVisibilityGeneration
     }
 
     var activePublishIDForTesting: UUID? {
