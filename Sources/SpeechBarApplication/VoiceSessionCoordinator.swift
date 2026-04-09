@@ -478,6 +478,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeFinalizeStartedAt = Date()
         overlayPhase = .finalizing
         overlaySubtitle = "转写中"
+        beginPublishFeedbackIfNeeded()
         if let activeSessionStartedAt {
             performanceLog(
                 "finalize started, captureDuration=\(String(format: "%.3f", Date().timeIntervalSince(activeSessionStartedAt)))s"
@@ -615,20 +616,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
             let endedAt = activeFinalizeStartedAt ?? completedAt
             return max(0, endedAt.timeIntervalSince(startedAt))
         }
-        let publishFeedbackID = UUID()
-        activePublishFeedbackID = publishFeedbackID
+        let publishFeedbackID = beginPublishFeedbackIfNeeded()
         let deliveryOutcome: TranscriptDeliveryOutcome
         do {
             overlayPhase = .publishing
             overlaySubtitle = isStreamingInterimPublishingActive ? "更新中" : "粘贴中"
-            publishFeedbackNotifier.notify(
-                .started(
-                    TranscriptPublishFeedbackStart(
-                        publishID: publishFeedbackID,
-                        transcript: publishedTranscript
-                    )
-                )
-            )
             let publishStartedAt = Date()
             if isStreamingInterimPublishingActive, let streamingTranscriptPublisher {
                 deliveryOutcome = try await streamingTranscriptPublisher.finishStreamingSession(
@@ -650,14 +642,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 "publish finished, publishLatency=\(String(format: "%.3f", Date().timeIntervalSince(publishStartedAt)))s"
             )
         } catch {
-            if let activePublishFeedbackID {
-                publishFeedbackNotifier.notify(
-                    .failed(
-                        TranscriptPublishFeedbackFailure(publishID: activePublishFeedbackID)
-                    )
-                )
-            }
-            self.activePublishFeedbackID = nil
+            notifyPublishFeedbackFailureIfNeeded()
             await teardownActiveSession()
             sessionState = .idle
             overlayPhase = .hidden
@@ -702,6 +687,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     }
 
     private func failActiveSession(message: String) async {
+        notifyPublishFeedbackFailureIfNeeded()
         await teardownActiveSession()
         sessionState = .failed(message)
         statusMessage = message
@@ -710,6 +696,37 @@ public final class VoiceSessionCoordinator: ObservableObject {
         audioLevelWindow = []
         lastAudioLevelWindowUpdateAt = nil
         activeInputHints = []
+    }
+
+    @discardableResult
+    private func beginPublishFeedbackIfNeeded() -> UUID {
+        if let activePublishFeedbackID {
+            return activePublishFeedbackID
+        }
+
+        let publishFeedbackID = UUID()
+        activePublishFeedbackID = publishFeedbackID
+        publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: publishFeedbackID
+                )
+            )
+        )
+        return publishFeedbackID
+    }
+
+    private func notifyPublishFeedbackFailureIfNeeded() {
+        guard let activePublishFeedbackID else {
+            return
+        }
+
+        publishFeedbackNotifier.notify(
+            .failed(
+                TranscriptPublishFeedbackFailure(publishID: activePublishFeedbackID)
+            )
+        )
+        self.activePublishFeedbackID = nil
     }
 
     private func teardownActiveSession() async {

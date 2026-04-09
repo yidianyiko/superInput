@@ -8,6 +8,7 @@ final class TranscriptInjectionOverlayController: NSObject {
     private let panel: NSPanel
     private let store = TranscriptInjectionOverlayStore()
     private let targetProvider: any TranscriptInjectionTargetSnapshotProviding
+    private let fallbackTargetSnapshot: @MainActor @Sendable () -> TranscriptInjectionTargetSnapshot?
     private let sleepClock: any SleepClock
     private let visibleDuration: Duration
     private var feedbackTask: Task<Void, Never>?
@@ -17,10 +18,14 @@ final class TranscriptInjectionOverlayController: NSObject {
     init(
         coordinator: VoiceSessionCoordinator,
         targetProvider: any TranscriptInjectionTargetSnapshotProviding,
+        fallbackTargetSnapshot: @escaping @MainActor @Sendable () -> TranscriptInjectionTargetSnapshot? = {
+            TranscriptInjectionOverlayController.defaultFallbackTargetSnapshot()
+        },
         sleepClock: any SleepClock = ContinuousSleepClock(),
         visibleDuration: Duration = .milliseconds(700)
     ) {
         self.targetProvider = targetProvider
+        self.fallbackTargetSnapshot = fallbackTargetSnapshot
         self.sleepClock = sleepClock
         self.visibleDuration = visibleDuration
 
@@ -71,7 +76,9 @@ final class TranscriptInjectionOverlayController: NSObject {
     private func handle(_ event: TranscriptPublishFeedbackEvent) async {
         switch event {
         case .started(let start):
-            guard let target = await targetProvider.currentTranscriptInjectionTargetSnapshot() else {
+            let target = await targetProvider.currentTranscriptInjectionTargetSnapshot()
+                ?? fallbackTargetSnapshot()
+            guard let target else {
                 scheduledHideTask?.cancel()
                 scheduledHideTask = nil
                 store.clear()
@@ -194,5 +201,28 @@ final class TranscriptInjectionOverlayController: NSObject {
 
     var panelIgnoresMouseEventsForTesting: Bool {
         panel.ignoresMouseEvents
+    }
+
+    private static func defaultFallbackTargetSnapshot() -> TranscriptInjectionTargetSnapshot? {
+        let targetScreen = NSScreen.main
+            ?? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
+            ?? NSScreen.screens.first
+        guard let screen = targetScreen else {
+            return nil
+        }
+
+        let visibleFrame = screen.visibleFrame
+        let destinationPoint = CGPoint(x: visibleFrame.midX, y: visibleFrame.midY)
+        let frontmostApplication = NSWorkspace.shared.frontmostApplication
+
+        return TranscriptInjectionTargetSnapshot(
+            processIdentifier: frontmostApplication?.processIdentifier ?? 0,
+            appIdentifier: frontmostApplication?.bundleIdentifier ?? "fallback.screen",
+            appName: frontmostApplication?.localizedName ?? "Fallback Screen",
+            screenFrame: screen.frame,
+            windowFrame: nil,
+            elementFrame: nil,
+            destinationPoint: destinationPoint
+        )
     }
 }

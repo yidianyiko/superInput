@@ -155,9 +155,11 @@ struct TranscriptInjectionOverlayControllerTests {
     @MainActor
     func missingTargetSnapshotSkipsOverlayPresentation() async throws {
         let dependencies = makeTranscriptInjectionOverlayDependencies(targetSnapshot: nil)
+        let fallbackTargetSnapshot = makeFallbackTranscriptInjectionTargetSnapshot()
         let controller = TranscriptInjectionOverlayController(
             coordinator: dependencies.coordinator,
             targetProvider: dependencies.targetProvider,
+            fallbackTargetSnapshot: { fallbackTargetSnapshot },
             visibleDuration: .seconds(10)
         )
 
@@ -170,10 +172,12 @@ struct TranscriptInjectionOverlayControllerTests {
             )
         )
 
-        try await Task.sleep(for: .milliseconds(50))
+        try await eventually {
+            controller.panelIsVisibleForTesting
+        }
 
-        #expect(controller.activePublishIDForTesting == nil)
-        #expect(controller.panelIsVisibleForTesting == false)
+        #expect(controller.activePublishIDForTesting != nil)
+        #expect(controller.panelFrameForTesting == fallbackTargetSnapshot.screenFrame)
     }
 
     @Test
@@ -308,24 +312,26 @@ struct TranscriptInjectionOverlayControllerTests {
 
     @Test
     @MainActor
-    func startedWithoutTargetSnapshotClearsPreviouslyVisibleOverlay() async throws {
+    func startedWithoutTargetSnapshotFallsBackToScreenOverlay() async throws {
         let hardware = MockHardwareEventSource()
         let audio = MockAudioInputSource()
         let client = MockTranscriptionClient()
         let credentials = MockCredentialProvider(storedAPIKey: "test-key")
         let publisher = MockTranscriptPublisher()
         let targetProvider = MutableTranscriptInjectionTargetSnapshotProvider()
+        let fallbackTargetSnapshot = makeFallbackTranscriptInjectionTargetSnapshot()
         let coordinator = VoiceSessionCoordinator(
             hardwareSource: hardware,
             audioInputSource: audio,
             transcriptionClient: client,
             credentialProvider: credentials,
             transcriptPublisher: publisher,
-            sleepClock: ImmediateSleepClock()
+            sleepClock: ContinuousSleepClock()
         )
         let controller = TranscriptInjectionOverlayController(
             coordinator: coordinator,
             targetProvider: targetProvider,
+            fallbackTargetSnapshot: { fallbackTargetSnapshot },
             visibleDuration: .seconds(10)
         )
         let firstPublishID = UUID()
@@ -356,8 +362,52 @@ struct TranscriptInjectionOverlayControllerTests {
 
         try await Task.sleep(for: .milliseconds(150))
 
-        #expect(controller.activePublishIDForTesting == nil)
-        #expect(controller.panelIsVisibleForTesting == false)
+        #expect(controller.activePublishIDForTesting != nil)
+        #expect(controller.panelIsVisibleForTesting)
+        #expect(controller.panelFrameForTesting == fallbackTargetSnapshot.screenFrame)
+    }
+
+    @Test
+    @MainActor
+    func finalizingPhaseShowsOverlayBeforePublishStarts() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        client.finalizeDelay = .seconds(1)
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let targetProvider = MockTranscriptInjectionTargetSnapshotProvider(snapshot: nil)
+        let fallbackTargetSnapshot = makeFallbackTranscriptInjectionTargetSnapshot()
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+        let controller = TranscriptInjectionOverlayController(
+            coordinator: coordinator,
+            targetProvider: targetProvider,
+            fallbackTargetSnapshot: { fallbackTargetSnapshot },
+            visibleDuration: .seconds(10)
+        )
+
+        coordinator.start()
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        coordinator.finalizeCaptureFromOverlay()
+
+        try await eventually {
+            controller.panelIsVisibleForTesting
+        }
+
+        #expect(controller.panelFrameForTesting == fallbackTargetSnapshot.screenFrame)
     }
 }
 
@@ -400,6 +450,18 @@ private struct TranscriptInjectionOverlayTestDependencies {
     let coordinator: VoiceSessionCoordinator
     let targetProvider: MockTranscriptInjectionTargetSnapshotProvider
     let targetSnapshot: TranscriptInjectionTargetSnapshot?
+}
+
+private func makeFallbackTranscriptInjectionTargetSnapshot() -> TranscriptInjectionTargetSnapshot {
+    TranscriptInjectionTargetSnapshot(
+        processIdentifier: 9999,
+        appIdentifier: "fallback.screen",
+        appName: "Fallback Screen",
+        screenFrame: CGRect(x: 80, y: 60, width: 1280, height: 820),
+        windowFrame: nil,
+        elementFrame: nil,
+        destinationPoint: CGPoint(x: 720, y: 470)
+    )
 }
 
 private final class MutableTranscriptInjectionTargetSnapshotProvider: TranscriptInjectionTargetSnapshotProviding, @unchecked Sendable {

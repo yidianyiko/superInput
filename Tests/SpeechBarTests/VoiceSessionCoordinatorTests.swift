@@ -108,9 +108,52 @@ struct VoiceSessionCoordinatorTests {
             return
         }
 
-        #expect(started.transcript.text == "ni hao")
         #expect(completed.outcome == .pasteShortcutSent)
         #expect(started.publishID == completed.publishID)
+    }
+
+    @Test
+    @MainActor
+    func publishFeedbackNotifierEmitsStartedEventWhenCaptureBeginsFinalizing() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        let eventTask = Task {
+            try await collectPublishFeedbackEvents(
+                from: coordinator.publishFeedbackNotifier.events,
+                count: 1
+            )
+        }
+
+        coordinator.start()
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        coordinator.finalizeCaptureFromOverlay()
+
+        let events = try await eventTask.value
+        #expect(events.count == 1)
+
+        guard case .started = events[0] else {
+            Issue.record("Expected started event while finalizing.")
+            return
+        }
     }
 
     @Test

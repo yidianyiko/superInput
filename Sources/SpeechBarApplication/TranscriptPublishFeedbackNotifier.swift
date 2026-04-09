@@ -3,14 +3,14 @@ import SpeechBarDomain
 
 public struct TranscriptPublishFeedbackStart: Sendable, Equatable, Identifiable {
     public let publishID: UUID
-    public let transcript: PublishedTranscript
+    public let transcript: PublishedTranscript?
     public let createdAt: Date
 
     public var id: UUID { publishID }
 
     public init(
         publishID: UUID,
-        transcript: PublishedTranscript,
+        transcript: PublishedTranscript? = nil,
         createdAt: Date = Date()
     ) {
         self.publishID = publishID
