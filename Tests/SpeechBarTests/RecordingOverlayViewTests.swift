@@ -88,7 +88,10 @@ struct RecordingOverlayViewTests {
     @Test
     @MainActor
     func finalizingPhaseHostsInNSHostingView() async throws {
-        let dependencies = makeRecordingOverlayDependencies(finalizeDelay: .milliseconds(200))
+        let dependencies = makeRecordingOverlayDependencies(
+            finalizeDelay: .milliseconds(200),
+            sleepClock: ContinuousSleepClock()
+        )
         dependencies.coordinator.start()
 
         dependencies.hardware.send(
@@ -182,7 +185,8 @@ private func makeRecordingOverlayDependencies(
     finalizeDelay: Duration? = nil,
     memoryRetriever: (any MemoryRetriever)? = nil,
     memoryRecallEnabled: Bool = false,
-    snapshotProvider: (any FocusedInputSnapshotProviding)? = nil
+    snapshotProvider: (any FocusedInputSnapshotProviding)? = nil,
+    sleepClock: any SleepClock = ImmediateSleepClock()
 ) -> RecordingOverlayViewTestDependencies {
     let hardware = MockHardwareEventSource()
     let audio = MockAudioInputSource()
@@ -198,7 +202,7 @@ private func makeRecordingOverlayDependencies(
         transcriptPublisher: publisher,
         focusedSnapshotProvider: snapshotProvider,
         memoryRetriever: memoryRetriever,
-        sleepClock: ImmediateSleepClock(),
+        sleepClock: sleepClock,
         memoryRecallEnabled: { memoryRecallEnabled }
     )
 

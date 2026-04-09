@@ -241,7 +241,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
     }
 
     private func handleHardwareEvent(_ event: HardwareEvent) async {
-        switch mapAppIntent(from: event) {
+        guard let intent = mapNormalizedAppIntent(from: event) else {
+            return
+        }
+
+        switch intent {
         case .startVoiceCapture:
             await beginVoiceCapture()
         case .stopVoiceCapture:
@@ -250,6 +254,41 @@ public final class VoiceSessionCoordinator: ObservableObject {
             await switchWindow(direction)
         case .pressReturnKey:
             returnKeyHandler()
+        }
+    }
+
+    private func mapNormalizedAppIntent(from event: HardwareEvent) -> AppIntent? {
+        if usesRawPushToTalkToggleSemantics(event.source) {
+            switch event.kind {
+            case .pushToTalkPressed:
+                return isVoiceCaptureFlowActive
+                    ? .stopVoiceCapture(source: event.source)
+                    : .startVoiceCapture(source: event.source)
+            case .pushToTalkReleased:
+                return nil
+            default:
+                break
+            }
+        }
+
+        return mapAppIntent(from: event)
+    }
+
+    private var isVoiceCaptureFlowActive: Bool {
+        switch sessionState {
+        case .requestingPermission, .connecting, .recording, .finalizing:
+            return true
+        case .idle, .failed:
+            return false
+        }
+    }
+
+    private func usesRawPushToTalkToggleSemantics(_ source: HardwareSourceKind) -> Bool {
+        switch source {
+        case .usbHID, .usbRotaryKnob:
+            return true
+        case .onScreenButton, .globalSpaceKey, .globalShortcut, .globalRightCommandKey, .keyboardRotaryTest:
+            return false
         }
     }
 
@@ -755,7 +794,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 try await self.transcriptionClient.finalize()
             }
             group.addTask {
-                try await ContinuousSleepClock().sleep(for: self.finalizeRequestTimeout)
+                try await self.sleepClock.sleep(for: self.finalizeRequestTimeout)
                 throw NSError(
                     domain: "VoiceSessionCoordinator",
                     code: -1,

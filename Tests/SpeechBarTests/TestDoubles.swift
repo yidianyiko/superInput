@@ -274,6 +274,14 @@ struct ImmediateSleepClock: SleepClock {
     func sleep(for duration: Duration) async throws {}
 }
 
+struct ThrowingSleepClock: SleepClock {
+    let error: any Error
+
+    func sleep(for duration: Duration) async throws {
+        throw error
+    }
+}
+
 struct MockUserProfileContextProvider: UserProfileContextProviding {
     var context = UserProfileContext()
 
