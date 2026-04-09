@@ -16,6 +16,9 @@ public protocol GlobalHotKeyRegistering {
 public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked Sendable {
     public let events: AsyncStream<HardwareEvent>
 
+    private static let hotKeySignature: UInt32 = 0x53505348
+    private static let hotKeyIdentifierGenerator = HotKeyIdentifierGenerator()
+
     private let combination: RecordingHotkeyCombination
     private let registrar: GlobalHotKeyRegistering
     private let hotKeyID: EventHotKeyID
@@ -52,7 +55,7 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         }
         self.combination = combination
         self.registrar = registrar
-        self.hotKeyID = EventHotKeyID(signature: 0x53505348, id: 1)
+        self.hotKeyID = EventHotKeyID(signature: Self.hotKeySignature, id: Self.makeHotKeyIdentifier())
         self.continuation = capturedContinuation!
 
         guard combination.validationResult == .valid else {
@@ -145,12 +148,30 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         return eventHotKeyID
     }
 
+    private static func makeHotKeyIdentifier() -> UInt32 {
+        hotKeyIdentifierGenerator.nextIdentifier()
+    }
+
     func registrationStatusForTesting() -> RecordingHotkeyRegistrationStatus {
         registrationStatus
     }
 
     func eventsForTesting(limit: Int) -> [HardwareEvent] {
         Array(eventHistory.prefix(limit))
+    }
+}
+
+private final class HotKeyIdentifierGenerator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var nextHotKeyIdentifier: UInt32 = 1
+
+    func nextIdentifier() -> UInt32 {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let identifier = nextHotKeyIdentifier
+        nextHotKeyIdentifier = nextHotKeyIdentifier == UInt32.max ? 1 : nextHotKeyIdentifier + 1
+        return identifier
     }
 }
 

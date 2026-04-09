@@ -21,6 +21,73 @@ struct GlobalShortcutToggleSourceTests {
     }
 
     @Test
+    func assignsUniqueHotkeyIdentifiersToEachInstance() {
+        let firstRegistrar = MockGlobalHotKeyRegistrar(registerStatus: noErr)
+        _ = GlobalShortcutToggleSource(
+            combination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_R),
+                modifiers: UInt32(controlKey | optionKey | cmdKey)
+            ),
+            registrar: firstRegistrar
+        )
+
+        let secondRegistrar = MockGlobalHotKeyRegistrar(registerStatus: noErr)
+        _ = GlobalShortcutToggleSource(
+            combination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_R),
+                modifiers: UInt32(controlKey | optionKey | cmdKey)
+            ),
+            registrar: secondRegistrar
+        )
+
+        #expect(firstRegistrar.registeredHotKeyID != nil)
+        #expect(secondRegistrar.registeredHotKeyID != nil)
+        let firstHotKeyID = firstRegistrar.registeredHotKeyID ?? EventHotKeyID()
+        let secondHotKeyID = secondRegistrar.registeredHotKeyID ?? EventHotKeyID()
+        #expect(
+            firstHotKeyID.signature != secondHotKeyID.signature ||
+            firstHotKeyID.id != secondHotKeyID.id
+        )
+    }
+
+    @Test
+    func cleansUpAfterFailedRegistration() {
+        let registrar = MockGlobalHotKeyRegistrar(registerStatus: OSStatus(eventHotKeyExistsErr))
+        let source = GlobalShortcutToggleSource(
+            combination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_R),
+                modifiers: UInt32(controlKey | optionKey | cmdKey)
+            ),
+            registrar: registrar
+        )
+
+        #expect(source.registrationStatusForTesting() == .registrationFailed)
+        #expect(registrar.installHandlerCallCount == 1)
+        #expect(registrar.registerCallCount == 1)
+        #expect(registrar.unregisterCallCount == 1)
+        #expect(registrar.removeHandlerCallCount == 1)
+    }
+
+    @Test
+    func cleansUpOnDeinit() {
+        let registrar = MockGlobalHotKeyRegistrar(registerStatus: noErr)
+        do {
+            let source = GlobalShortcutToggleSource(
+                combination: RecordingHotkeyCombination(
+                    keyCode: UInt32(kVK_ANSI_R),
+                    modifiers: UInt32(controlKey | optionKey | cmdKey)
+                ),
+                registrar: registrar
+            )
+
+            #expect(source.registrationStatusForTesting() == .registered)
+        }
+
+        #expect(registrar.unregisterCallCount == 1)
+        #expect(registrar.removeHandlerCallCount == 1)
+    }
+
+    @Test
     func togglesPressedAndReleasedForRepeatedHotkeyMatches() async {
         let registrar = MockGlobalHotKeyRegistrar(registerStatus: noErr)
         let source = GlobalShortcutToggleSource(
@@ -49,8 +116,11 @@ struct GlobalShortcutToggleSourceTests {
             registrar: registrar
         )
 
-        registrar.invokeInstalledHandler(with: EventHotKeyID(signature: 0x53505348, id: 1))
-        registrar.invokeInstalledHandler(with: EventHotKeyID(signature: 0x53505348, id: 1))
+        #expect(registrar.registeredHotKeyID != nil)
+
+        let hotKeyID = registrar.registeredHotKeyID ?? EventHotKeyID()
+        registrar.invokeInstalledHandler(with: hotKeyID)
+        registrar.invokeInstalledHandler(with: hotKeyID)
 
         let events = source.eventsForTesting(limit: 2)
         #expect(events.map(\.kind) == [.pushToTalkPressed, .pushToTalkReleased])
@@ -67,7 +137,12 @@ struct GlobalShortcutToggleSourceTests {
             registrar: registrar
         )
 
-        registrar.invokeInstalledHandler(with: EventHotKeyID(signature: 0x53505348, id: 99))
+        #expect(registrar.registeredHotKeyID != nil)
+
+        let registeredHotKeyID = registrar.registeredHotKeyID ?? EventHotKeyID()
+        registrar.invokeInstalledHandler(
+            with: EventHotKeyID(signature: registeredHotKeyID.signature, id: registeredHotKeyID.id &+ 1)
+        )
 
         let events = source.eventsForTesting(limit: 1)
         #expect(events.isEmpty)
@@ -83,6 +158,7 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
     private(set) var removeHandlerCallCount = 0
     private(set) var registeredKeyCode: UInt32?
     private(set) var registeredModifiers: UInt32?
+    private(set) var registeredHotKeyID: EventHotKeyID?
     private var installedHandler: EventHandlerUPP?
     private var installedUserData: UnsafeMutableRawPointer?
     private let installedEventClass = OSType(kEventClassKeyboard)
@@ -108,6 +184,7 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
         registerCallCount += 1
         registeredKeyCode = keyCode
         registeredModifiers = modifiers
+        registeredHotKeyID = hotKeyID
         return registerStatus
     }
 
