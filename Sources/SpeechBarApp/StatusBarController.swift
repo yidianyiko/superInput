@@ -21,6 +21,7 @@ final class StatusBarController: NSObject {
     private let homeWindowControllerFactory: () -> any HomeWindowControlling
     private var homeWindowController: (any HomeWindowControlling)?
     private var sessionStateObservation: AnyCancellable?
+    private var hotkeySettingsObservation: AnyCancellable?
 
     init(
         coordinator: VoiceSessionCoordinator,
@@ -64,7 +65,7 @@ final class StatusBarController: NSObject {
         }
         super.init()
 
-        configureStatusItem()
+        configureStatusItem(recordingHotkeySettingsStore: recordingHotkeySettingsStore)
         configurePopover(
             coordinator: coordinator,
             agentMonitorCoordinator: agentMonitorCoordinator,
@@ -80,12 +81,13 @@ final class StatusBarController: NSObject {
         )
         configureMenu()
         bindCoordinator(coordinator)
+        bindHotkeySettings(recordingHotkeySettingsStore)
     }
 
-    private func configureStatusItem() {
+    private func configureStatusItem(recordingHotkeySettingsStore: RecordingHotkeySettingsStore) {
         guard let button = statusItem.button else { return }
         button.imagePosition = .imageOnly
-        button.toolTip = "SlashVibe\n右侧 Command 开始/结束录音\nCtrl+Option+J/K 测试旋钮切换"
+        button.toolTip = recordingHotkeySettingsStore.statusItemToolTipText
         button.target = self
         button.action = #selector(handleStatusItemClick(_:))
         button.sendAction(on: [.leftMouseUp, .rightMouseUp, .rightMouseDown])
@@ -134,6 +136,10 @@ final class StatusBarController: NSObject {
         popover.contentViewController?.view.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
     }
 
+    var statusItemToolTipForTesting: String? {
+        statusItem.button?.toolTip
+    }
+
     private func updatePopoverAppearance() {
         let appearanceName: NSAppearance.Name = currentThemePreset().palette.isDark ? .darkAqua : .aqua
         popover.contentViewController?.view.appearance = NSAppearance(named: appearanceName)
@@ -176,6 +182,21 @@ final class StatusBarController: NSObject {
                 self?.updateStatusItemAppearance(for: state)
                 self?.handleSessionStateChange(state)
             }
+    }
+
+    private func bindHotkeySettings(_ recordingHotkeySettingsStore: RecordingHotkeySettingsStore) {
+        updateStatusItemToolTip(recordingHotkeySettingsStore.statusItemToolTipText)
+        hotkeySettingsObservation = recordingHotkeySettingsStore.$configuration
+            .sink { [weak self, weak recordingHotkeySettingsStore] configuration in
+                guard let recordingHotkeySettingsStore else { return }
+                self?.updateStatusItemToolTip(
+                    recordingHotkeySettingsStore.statusItemToolTipText(for: configuration)
+                )
+            }
+    }
+
+    private func updateStatusItemToolTip(_ toolTip: String) {
+        statusItem.button?.toolTip = toolTip
     }
 
     private func updateStatusItemAppearance(for state: SpeechSessionState) {

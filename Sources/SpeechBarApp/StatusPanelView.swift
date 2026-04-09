@@ -10,7 +10,7 @@ struct StatusPanelView: View {
     @ObservedObject var diagnosticsCoordinator: DiagnosticsCoordinator
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var audioInputSettingsStore: AudioInputSettingsStore
-    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
+    @ObservedObject var recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     @ObservedObject var modelSettingsStore: OpenAIModelSettingsStore
     @ObservedObject var localWhisperModelStore: LocalWhisperModelStore
     @ObservedObject var senseVoiceModelStore: SenseVoiceModelStore
@@ -104,7 +104,7 @@ struct StatusPanelView: View {
                         .foregroundStyle(palette.textSecondary)
                         .textCase(.uppercase)
                         .tracking(1.2)
-                    Text("右侧 Command 单击开始，再次单击结束。")
+                    Text(recordingHotkeySettingsStore.panelHelpText)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(palette.textMuted)
                 }
@@ -473,7 +473,7 @@ struct StatusPanelView: View {
             return "先保存当前转写服务的 API Key，再开始录音。"
         }
         if isRecordingFlowActive {
-            return "正在听你说话，再点一次按钮或按右侧 Command 结束。"
+            return recordingHotkeySettingsStore.recordingStopHelpText
         }
         if case .finalizing = coordinator.sessionState {
             return "正在把最终文本写入当前窗口。"

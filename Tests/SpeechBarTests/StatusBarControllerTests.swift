@@ -1,10 +1,93 @@
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 import Testing
 @testable import SpeechBarApp
 import SpeechBarApplication
 import SpeechBarDomain
 import SpeechBarInfrastructure
+
+@Suite("StatusBarControllerHotkeyCopy")
+struct StatusBarControllerHotkeyCopyTests {
+    @Test
+    @MainActor
+    func tooltipUsesPersistedCustomHotkeyCopyAtLaunch() {
+        let dependencies = makeStatusBarDependencies(
+            hotkeyConfiguration: RecordingHotkeyConfiguration(
+                mode: .customCombo,
+                customCombination: RecordingHotkeyCombination(
+                    keyCode: UInt32(kVK_ANSI_J),
+                    modifiers: UInt32(controlKey | optionKey)
+                )
+            )
+        )
+
+        let controller = StatusBarController(
+            coordinator: dependencies.coordinator,
+            agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
+            embeddedDisplayCoordinator: dependencies.embeddedDisplayCoordinator,
+            diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
+            pushToTalkSource: dependencies.pushToTalkSource,
+            userProfileStore: dependencies.userProfileStore,
+            audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
+            modelSettingsStore: dependencies.modelSettingsStore,
+            polishPlaygroundStore: dependencies.polishPlaygroundStore,
+            localWhisperModelStore: dependencies.localWhisperModelStore,
+            senseVoiceModelStore: dependencies.senseVoiceModelStore,
+            memoryConstellationStore: dependencies.memoryConstellationStore,
+            memoryFeatureFlagStore: dependencies.memoryFeatureFlagStore
+        )
+
+        #expect(
+            controller.statusItemToolTipForTesting?.contains("⌃⌥J") == true
+        )
+        #expect(
+            controller.statusItemToolTipForTesting?.contains("右侧 Command") == false
+        )
+    }
+
+    @Test
+    @MainActor
+    func tooltipUpdatesWhenHotkeyModeChanges() {
+        let dependencies = makeStatusBarDependencies()
+
+        let controller = StatusBarController(
+            coordinator: dependencies.coordinator,
+            agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
+            embeddedDisplayCoordinator: dependencies.embeddedDisplayCoordinator,
+            diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
+            pushToTalkSource: dependencies.pushToTalkSource,
+            userProfileStore: dependencies.userProfileStore,
+            audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
+            modelSettingsStore: dependencies.modelSettingsStore,
+            polishPlaygroundStore: dependencies.polishPlaygroundStore,
+            localWhisperModelStore: dependencies.localWhisperModelStore,
+            senseVoiceModelStore: dependencies.senseVoiceModelStore,
+            memoryConstellationStore: dependencies.memoryConstellationStore,
+            memoryFeatureFlagStore: dependencies.memoryFeatureFlagStore
+        )
+
+        #expect(
+            controller.statusItemToolTipForTesting?.contains("右侧 Command") == true
+        )
+
+        let customCombination = RecordingHotkeyCombination(
+            keyCode: UInt32(kVK_ANSI_K),
+            modifiers: UInt32(controlKey | optionKey | shiftKey)
+        )
+        dependencies.recordingHotkeySettingsStore.setMode(.customCombo)
+        dependencies.recordingHotkeySettingsStore.setCustomCombination(customCombination)
+
+        #expect(
+            controller.statusItemToolTipForTesting?.contains("⌃⌥⇧K") == true
+        )
+        #expect(
+            controller.statusItemToolTipForTesting?.contains("右侧 Command") == false
+        )
+    }
+}
 
 @Suite("StatusBarController")
 struct StatusBarControllerTests {
@@ -141,7 +224,9 @@ struct StatusBarControllerTests {
 }
 
 @MainActor
-private func makeStatusBarDependencies() -> StatusBarTestDependencies {
+private func makeStatusBarDependencies(
+    hotkeyConfiguration: RecordingHotkeyConfiguration = .defaultRightCommand
+) -> StatusBarTestDependencies {
     let defaults = UserDefaults(suiteName: "StatusBarControllerTests.\(UUID().uuidString)")!
     let diagnosticsDirectory = FileManager.default.temporaryDirectory
         .appendingPathComponent("StatusBarControllerTests-\(UUID().uuidString)", isDirectory: true)
@@ -175,13 +260,17 @@ private func makeStatusBarDependencies() -> StatusBarTestDependencies {
         transport: LoopbackBoardTransport()
     )
     let pushToTalkSource = OnScreenPushToTalkSource()
+    defaults.set(
+        try? JSONEncoder().encode(hotkeyConfiguration),
+        forKey: RecordingHotkeySettingsStore.defaultsKey
+    )
     let recordingHotkeySettingsStore = RecordingHotkeySettingsStore(
         defaults: defaults,
         controller: MockRecordingHotkeySettingsController(
             diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot(
-                configuration: .defaultRightCommand,
+                configuration: hotkeyConfiguration,
                 registrationStatus: .registered,
-                requiresAccessibility: true,
+                requiresAccessibility: hotkeyConfiguration.mode == .rightCommand,
                 accessibilityTrusted: true,
                 lastTrigger: nil,
                 guidanceText: nil

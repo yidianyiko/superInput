@@ -382,7 +382,7 @@ struct HomeWindowView: View {
                         .foregroundStyle(palette.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text("按右侧 Command 开始或结束录音。转写、润色与写入整合为一个更安静的工作流。")
+                    Text(recordingHotkeySettingsStore.homeHeroHelpText)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(palette.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -397,7 +397,10 @@ struct HomeWindowView: View {
                         tint: sessionTint
                     )
 
-                    ShortcutKeyCaps(palette: palette, symbols: ["⌘", "Press", "Talk"])
+                    ShortcutKeyCaps(
+                        palette: palette,
+                        symbols: recordingHotkeySettingsStore.primaryShortcutSymbols
+                    )
                 }
             }
 
@@ -1620,6 +1623,11 @@ struct HomeWindowView: View {
                     }
                 }
             }
+
+            RecordingHotkeySettingsCard(
+                store: recordingHotkeySettingsStore,
+                palette: store.palette
+            )
 
             GlassCard(palette: store.palette, padding: 22) {
                 VStack(alignment: .leading, spacing: 16) {
