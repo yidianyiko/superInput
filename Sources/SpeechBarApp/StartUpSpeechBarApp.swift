@@ -54,7 +54,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 private struct AppDependencies {
     let pushToTalkSource: OnScreenPushToTalkSource
-    let globalShortcutSource: GlobalRightCommandPushToTalkSource
+    let recordingHotkeyController: RecordingHotkeyController
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     let rotaryTestSource: GlobalRotaryKeyTestSource
     let boardEventSource: BoardEventFileHardwareEventSource
     let boardInputBridgeController: BoardInputBridgeController
@@ -80,13 +81,18 @@ private struct AppDependencies {
 
     init() {
         let pushToTalkSource = OnScreenPushToTalkSource()
-        let globalShortcutSource = GlobalRightCommandPushToTalkSource()
+        let recordingHotkeyController = RecordingHotkeyController(
+            configuration: RecordingHotkeySettingsStore.loadConfiguration()
+        )
+        let recordingHotkeySettingsStore = RecordingHotkeySettingsStore(
+            controller: recordingHotkeyController
+        )
         let rotaryTestSource = GlobalRotaryKeyTestSource()
         let boardEventSource = BoardEventFileHardwareEventSource()
         let boardInputBridgeController = BoardInputBridgeController()
         let hardwareSource = MergedHardwareEventSource(sources: [
             pushToTalkSource,
-            globalShortcutSource,
+            recordingHotkeyController,
             rotaryTestSource,
             boardEventSource
         ])
@@ -229,7 +235,8 @@ private struct AppDependencies {
         let transport: any EmbeddedBoardTransport = LoopbackBoardTransport()
 
         self.pushToTalkSource = pushToTalkSource
-        self.globalShortcutSource = globalShortcutSource
+        self.recordingHotkeyController = recordingHotkeyController
+        self.recordingHotkeySettingsStore = recordingHotkeySettingsStore
         self.rotaryTestSource = rotaryTestSource
         self.boardEventSource = boardEventSource
         self.boardInputBridgeController = boardInputBridgeController
@@ -309,6 +316,7 @@ private struct AppDependencies {
             pushToTalkSource: pushToTalkSource,
             userProfileStore: userProfileStore,
             audioInputSettingsStore: audioInputSettingsStore,
+            recordingHotkeySettingsStore: recordingHotkeySettingsStore,
             modelSettingsStore: modelSettingsStore,
             polishPlaygroundStore: polishPlaygroundStore,
             localWhisperModelStore: localWhisperModelStore,

@@ -23,6 +23,7 @@ struct StatusBarControllerTests {
             pushToTalkSource: dependencies.pushToTalkSource,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -58,6 +59,7 @@ struct StatusBarControllerTests {
             pushToTalkSource: dependencies.pushToTalkSource,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -94,6 +96,7 @@ struct StatusBarControllerTests {
             pushToTalkSource: dependencies.pushToTalkSource,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -123,6 +126,7 @@ struct StatusBarControllerTests {
             pushToTalkSource: dependencies.pushToTalkSource,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -171,6 +175,19 @@ private func makeStatusBarDependencies() -> StatusBarTestDependencies {
         transport: LoopbackBoardTransport()
     )
     let pushToTalkSource = OnScreenPushToTalkSource()
+    let recordingHotkeySettingsStore = RecordingHotkeySettingsStore(
+        defaults: defaults,
+        controller: MockRecordingHotkeySettingsController(
+            diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot(
+                configuration: .defaultRightCommand,
+                registrationStatus: .registered,
+                requiresAccessibility: true,
+                accessibilityTrusted: true,
+                lastTrigger: nil,
+                guidanceText: nil
+            )
+        )
+    )
     let userProfileStore = UserProfileStore(defaults: defaults)
     let audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
     let localWhisperModelStore = LocalWhisperModelStore(defaults: defaults)
@@ -195,6 +212,7 @@ private func makeStatusBarDependencies() -> StatusBarTestDependencies {
         embeddedDisplayCoordinator: embeddedDisplayCoordinator,
         diagnosticsCoordinator: diagnosticsCoordinator,
         pushToTalkSource: pushToTalkSource,
+        recordingHotkeySettingsStore: recordingHotkeySettingsStore,
         userProfileStore: userProfileStore,
         audioInputSettingsStore: audioInputSettingsStore,
         modelSettingsStore: modelSettingsStore,
@@ -214,6 +232,7 @@ private struct StatusBarTestDependencies {
     let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
     let diagnosticsCoordinator: DiagnosticsCoordinator
     let pushToTalkSource: OnScreenPushToTalkSource
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
     let modelSettingsStore: OpenAIModelSettingsStore

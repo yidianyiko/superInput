@@ -126,6 +126,7 @@ enum OffscreenHomeSnapshotRenderer {
             store: environment.homeStore,
             userProfileStore: environment.userProfileStore,
             audioInputSettingsStore: environment.audioInputSettingsStore,
+            recordingHotkeySettingsStore: environment.recordingHotkeySettingsStore,
             modelSettingsStore: environment.modelSettingsStore,
             polishPlaygroundStore: environment.polishPlaygroundStore,
             localWhisperModelStore: environment.localWhisperModelStore,
@@ -191,6 +192,7 @@ private final class SnapshotEnvironment {
     let embeddedDisplayCoordinator: EmbeddedDisplayCoordinator
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     let modelSettingsStore: OpenAIModelSettingsStore
     let polishPlaygroundStore: PolishPlaygroundStore
     let localWhisperModelStore: LocalWhisperModelStore
@@ -249,6 +251,13 @@ private final class SnapshotEnvironment {
 
         self.userProfileStore = UserProfileStore(defaults: defaults)
         self.audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
+        let recordingHotkeyController = SnapshotRecordingHotkeySettingsController(
+            configuration: RecordingHotkeySettingsStore.loadConfiguration(from: defaults)
+        )
+        self.recordingHotkeySettingsStore = RecordingHotkeySettingsStore(
+            defaults: defaults,
+            controller: recordingHotkeyController
+        )
         self.memoryFeatureFlagStore = MemoryFeatureFlagStore(defaults: defaults)
         if let memoryDisplayMode = command.memoryDisplayMode {
             self.memoryFeatureFlagStore.displayMode = memoryDisplayMode
@@ -402,4 +411,38 @@ private actor SnapshotTranscriptionClient: TranscriptionClient {
     func send(audioChunk: AudioChunk) async throws {}
     func finalize() async throws {}
     func close() async {}
+}
+
+private final class SnapshotRecordingHotkeySettingsController: RecordingHotkeySettingsControlling, @unchecked Sendable {
+    let diagnosticsUpdates: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>
+
+    private let diagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation
+
+    private(set) var diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot
+
+    init(configuration: RecordingHotkeyConfiguration) {
+        var capturedDiagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation?
+        self.diagnosticsUpdates = AsyncStream { continuation in
+            capturedDiagnosticsContinuation = continuation
+        }
+        self.diagnosticsContinuation = capturedDiagnosticsContinuation!
+        self.diagnosticsSnapshot = Self.makeSnapshot(configuration: configuration)
+    }
+
+    func apply(_ configuration: RecordingHotkeyConfiguration) {
+        diagnosticsSnapshot = Self.makeSnapshot(configuration: configuration)
+        diagnosticsContinuation.yield(diagnosticsSnapshot)
+    }
+
+    private static func makeSnapshot(configuration: RecordingHotkeyConfiguration) -> RecordingHotkeyDiagnosticsSnapshot {
+        let requiresAccessibility = configuration.mode == .rightCommand
+        return RecordingHotkeyDiagnosticsSnapshot(
+            configuration: configuration,
+            registrationStatus: .registered,
+            requiresAccessibility: requiresAccessibility,
+            accessibilityTrusted: true,
+            lastTrigger: nil,
+            guidanceText: nil
+        )
+    }
 }

@@ -14,6 +14,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
     private let modelSettingsStore: OpenAIModelSettingsStore
     private let polishPlaygroundStore: PolishPlaygroundStore
     private let audioInputSettingsStore: AudioInputSettingsStore
+    private let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     private let localWhisperModelStore: LocalWhisperModelStore
     private let senseVoiceModelStore: SenseVoiceModelStore
     private let memoryFeatureFlagStore: MemoryFeatureFlagStore
@@ -26,6 +27,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         pushToTalkSource: OnScreenPushToTalkSource,
         userProfileStore: UserProfileStore,
         audioInputSettingsStore: AudioInputSettingsStore,
+        recordingHotkeySettingsStore: RecordingHotkeySettingsStore,
         modelSettingsStore: OpenAIModelSettingsStore,
         polishPlaygroundStore: PolishPlaygroundStore,
         localWhisperModelStore: LocalWhisperModelStore,
@@ -42,6 +44,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
         self.modelSettingsStore = modelSettingsStore
         self.polishPlaygroundStore = polishPlaygroundStore
         self.audioInputSettingsStore = audioInputSettingsStore
+        self.recordingHotkeySettingsStore = recordingHotkeySettingsStore
         self.localWhisperModelStore = localWhisperModelStore
         self.senseVoiceModelStore = senseVoiceModelStore
         self.memoryFeatureFlagStore = memoryFeatureFlagStore
@@ -54,6 +57,7 @@ final class HomeWindowController: NSWindowController, NSWindowDelegate {
                 store: store,
                 userProfileStore: userProfileStore,
                 audioInputSettingsStore: audioInputSettingsStore,
+                recordingHotkeySettingsStore: recordingHotkeySettingsStore,
                 modelSettingsStore: modelSettingsStore,
                 polishPlaygroundStore: polishPlaygroundStore,
                 localWhisperModelStore: localWhisperModelStore,

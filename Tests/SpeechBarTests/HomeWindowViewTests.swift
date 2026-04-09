@@ -24,6 +24,7 @@ struct HomeWindowViewTests {
             store: dependencies.store,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -60,6 +61,7 @@ struct HomeWindowViewTests {
             store: dependencies.store,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -99,6 +101,7 @@ struct HomeWindowViewTests {
             store: dependencies.store,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             polishPlaygroundStore: dependencies.polishPlaygroundStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
@@ -153,6 +156,19 @@ private func makeHomeWindowDependencies() -> HomeWindowViewTestDependencies {
         transport: LoopbackBoardTransport()
     )
     let pushToTalkSource = OnScreenPushToTalkSource()
+    let recordingHotkeySettingsStore = RecordingHotkeySettingsStore(
+        defaults: defaults,
+        controller: MockRecordingHotkeySettingsController(
+            diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot(
+                configuration: .defaultRightCommand,
+                registrationStatus: .registered,
+                requiresAccessibility: true,
+                accessibilityTrusted: true,
+                lastTrigger: nil,
+                guidanceText: nil
+            )
+        )
+    )
     let userProfileStore = UserProfileStore(defaults: defaults)
     let audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
     let localWhisperModelStore = LocalWhisperModelStore(defaults: defaults)
@@ -179,6 +195,7 @@ private func makeHomeWindowDependencies() -> HomeWindowViewTestDependencies {
         store: store,
         userProfileStore: userProfileStore,
         audioInputSettingsStore: audioInputSettingsStore,
+        recordingHotkeySettingsStore: recordingHotkeySettingsStore,
         modelSettingsStore: modelSettingsStore,
         polishPlaygroundStore: polishPlaygroundStore,
         localWhisperModelStore: localWhisperModelStore,
@@ -226,6 +243,7 @@ private struct HomeWindowViewTestDependencies {
     let store: HomeWindowStore
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     let modelSettingsStore: OpenAIModelSettingsStore
     let polishPlaygroundStore: PolishPlaygroundStore
     let localWhisperModelStore: LocalWhisperModelStore

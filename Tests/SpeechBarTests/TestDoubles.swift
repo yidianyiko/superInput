@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import MemoryDomain
+@testable import SpeechBarApp
 @testable import SpeechBarInfrastructure
 import SpeechBarDomain
 
@@ -70,6 +71,42 @@ final class MockRecordingHotkeyRuntimeSource: RecordingHotkeyRuntimeSource, @unc
         isShutdown = true
         eventsContinuation.finish()
         diagnosticsContinuation.finish()
+    }
+}
+
+final class MockRecordingHotkeySettingsController: RecordingHotkeySettingsControlling, @unchecked Sendable {
+    let diagnosticsUpdates: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>
+
+    private let diagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation
+
+    private(set) var diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot
+    private(set) var appliedConfigurations: [RecordingHotkeyConfiguration] = []
+
+    init(diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot) {
+        var capturedDiagnosticsContinuation: AsyncStream<RecordingHotkeyDiagnosticsSnapshot>.Continuation?
+        self.diagnosticsUpdates = AsyncStream { continuation in
+            capturedDiagnosticsContinuation = continuation
+        }
+        self.diagnosticsContinuation = capturedDiagnosticsContinuation!
+        self.diagnosticsSnapshot = diagnosticsSnapshot
+    }
+
+    func apply(_ configuration: RecordingHotkeyConfiguration) {
+        appliedConfigurations.append(configuration)
+        diagnosticsSnapshot = RecordingHotkeyDiagnosticsSnapshot(
+            configuration: configuration,
+            registrationStatus: diagnosticsSnapshot.registrationStatus,
+            requiresAccessibility: diagnosticsSnapshot.requiresAccessibility,
+            accessibilityTrusted: diagnosticsSnapshot.accessibilityTrusted,
+            lastTrigger: diagnosticsSnapshot.lastTrigger,
+            guidanceText: diagnosticsSnapshot.guidanceText
+        )
+        diagnosticsContinuation.yield(diagnosticsSnapshot)
+    }
+
+    func emitDiagnostics(_ diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot) {
+        self.diagnosticsSnapshot = diagnosticsSnapshot
+        diagnosticsContinuation.yield(diagnosticsSnapshot)
     }
 }
 

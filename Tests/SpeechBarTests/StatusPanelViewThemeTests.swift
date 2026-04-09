@@ -50,6 +50,7 @@ struct StatusPanelViewThemeTests {
             diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
             userProfileStore: dependencies.userProfileStore,
             audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
             modelSettingsStore: dependencies.modelSettingsStore,
             localWhisperModelStore: dependencies.localWhisperModelStore,
             senseVoiceModelStore: dependencies.senseVoiceModelStore,
@@ -118,6 +119,19 @@ private func makeStatusPanelDependencies(defaults: UserDefaults) -> StatusPanelV
         transport: LoopbackBoardTransport()
     )
     let pushToTalkSource = OnScreenPushToTalkSource()
+    let recordingHotkeySettingsStore = RecordingHotkeySettingsStore(
+        defaults: defaults,
+        controller: MockRecordingHotkeySettingsController(
+            diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot(
+                configuration: .defaultRightCommand,
+                registrationStatus: .registered,
+                requiresAccessibility: true,
+                accessibilityTrusted: true,
+                lastTrigger: nil,
+                guidanceText: nil
+            )
+        )
+    )
     let userProfileStore = UserProfileStore(defaults: defaults)
     let audioInputSettingsStore = AudioInputSettingsStore(defaults: defaults)
     let localWhisperModelStore = LocalWhisperModelStore(defaults: defaults)
@@ -136,6 +150,7 @@ private func makeStatusPanelDependencies(defaults: UserDefaults) -> StatusPanelV
         diagnosticsCoordinator: diagnosticsCoordinator,
         userProfileStore: userProfileStore,
         audioInputSettingsStore: audioInputSettingsStore,
+        recordingHotkeySettingsStore: recordingHotkeySettingsStore,
         modelSettingsStore: modelSettingsStore,
         localWhisperModelStore: localWhisperModelStore,
         senseVoiceModelStore: senseVoiceModelStore,
@@ -187,6 +202,7 @@ private struct StatusPanelViewTestDependencies {
     let diagnosticsCoordinator: DiagnosticsCoordinator
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     let modelSettingsStore: OpenAIModelSettingsStore
     let localWhisperModelStore: LocalWhisperModelStore
     let senseVoiceModelStore: SenseVoiceModelStore
