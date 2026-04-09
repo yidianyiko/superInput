@@ -1,10 +1,13 @@
-import AppKit
 import Carbon.HIToolbox
 import Foundation
 import SpeechBarDomain
 
 public protocol GlobalHotKeyRegistering {
-    func installHandler(_ handler: EventHandlerUPP, userData: UnsafeMutableRawPointer?) -> OSStatus
+    func installHandler(
+        _ handler: EventHandlerUPP,
+        userData: UnsafeMutableRawPointer?,
+        eventHandlerRef: inout EventHandlerRef?
+    ) -> OSStatus
     func register(keyCode: UInt32, modifiers: UInt32, hotKeyID: EventHotKeyID, hotKeyRef: inout EventHotKeyRef?) -> OSStatus
     func unregister(_ hotKeyRef: EventHotKeyRef?)
     func removeHandler(_ eventHandlerRef: EventHandlerRef?)
@@ -44,7 +47,16 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         }
 
         let hotKeyID = EventHotKeyID(signature: 0x53505348, id: 1)
-        _ = registrar.installHandler(Self.hotKeyHandler, userData: nil)
+        let installStatus = registrar.installHandler(
+            Self.hotKeyHandler,
+            userData: nil,
+            eventHandlerRef: &eventHandlerRef
+        )
+
+        guard installStatus == noErr else {
+            registrationStatus = .registrationFailed
+            return
+        }
 
         guard let keyCode = combination.keyCode else {
             registrationStatus = .invalidConfiguration
@@ -57,7 +69,17 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
             hotKeyID: hotKeyID,
             hotKeyRef: &hotKeyRef
         )
-        registrationStatus = registerStatus == noErr ? .registered : .registrationFailed
+
+        guard registerStatus == noErr else {
+            registrar.unregister(hotKeyRef)
+            hotKeyRef = nil
+            registrar.removeHandler(eventHandlerRef)
+            eventHandlerRef = nil
+            registrationStatus = .registrationFailed
+            return
+        }
+
+        registrationStatus = .registered
     }
 
     deinit {
@@ -75,11 +97,11 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         continuation.yield(event)
     }
 
-    func registrationStatusForTesting() async -> RecordingHotkeyRegistrationStatus {
+    func registrationStatusForTesting() -> RecordingHotkeyRegistrationStatus {
         registrationStatus
     }
 
-    func eventsForTesting(limit: Int) async -> [HardwareEvent] {
+    func eventsForTesting(limit: Int) -> [HardwareEvent] {
         Array(eventHistory.prefix(limit))
     }
 }
@@ -87,7 +109,11 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
 public struct SystemGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
     public init() {}
 
-    public func installHandler(_ handler: EventHandlerUPP, userData: UnsafeMutableRawPointer?) -> OSStatus {
+    public func installHandler(
+        _ handler: EventHandlerUPP,
+        userData: UnsafeMutableRawPointer?,
+        eventHandlerRef: inout EventHandlerRef?
+    ) -> OSStatus {
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
@@ -98,7 +124,7 @@ public struct SystemGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
             1,
             &eventType,
             userData,
-            nil
+            &eventHandlerRef
         )
     }
 
