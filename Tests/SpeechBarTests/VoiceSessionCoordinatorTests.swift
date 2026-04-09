@@ -52,6 +52,129 @@ struct VoiceSessionCoordinatorTests {
 
     @Test
     @MainActor
+    func publishFeedbackNotifierEmitsStartedAndCompletedEventsForPastePath() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        await publisher.setOutcome(.pasteShortcutSent)
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        let eventTask = Task {
+            await collectPublishFeedbackEvents(
+                from: coordinator.publishFeedbackNotifier.events,
+                count: 2
+            )
+        }
+
+        coordinator.start()
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        audio.emit(AudioChunk(data: Data([0x01, 0x02]), format: .deepgramLinear16, sequenceNumber: 0))
+        client.emit(.interim("ni hao"))
+        client.emit(.final("ni hao"))
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventually {
+            coordinator.sessionState == .idle
+        }
+
+        let events = await eventTask.value
+        #expect(events.count == 2)
+
+        guard case .started(let started) = events[0] else {
+            Issue.record("Expected started event first.")
+            return
+        }
+
+        guard case .completed(let completed) = events[1] else {
+            Issue.record("Expected completed event second.")
+            return
+        }
+
+        #expect(started.transcript.text == "ni hao")
+        #expect(completed.outcome == .pasteShortcutSent)
+        #expect(started.publishID == completed.publishID)
+    }
+
+    @Test
+    @MainActor
+    func publishFeedbackNotifierEmitsFailedEventWhenPublisherThrows() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        await publisher.setError(MockFailure.publish)
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        let eventTask = Task {
+            await collectPublishFeedbackEvents(
+                from: coordinator.publishFeedbackNotifier.events,
+                count: 2
+            )
+        }
+
+        coordinator.start()
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        audio.emit(AudioChunk(data: Data([0x01, 0x02]), format: .deepgramLinear16, sequenceNumber: 0))
+        client.emit(.final("ni hao"))
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventually {
+            coordinator.sessionState == .idle
+        }
+
+        let events = await eventTask.value
+        #expect(events.count == 2)
+
+        guard case .started(let started) = events[0] else {
+            Issue.record("Expected started event first.")
+            return
+        }
+
+        guard case .failed(let failed) = events[1] else {
+            Issue.record("Expected failed event second.")
+            return
+        }
+
+        #expect(started.publishID == failed.publishID)
+    }
+
+    @Test
+    @MainActor
     func permissionDeniedMovesCoordinatorToFailedState() async throws {
         let hardware = MockHardwareEventSource()
         let audio = MockAudioInputSource()
@@ -884,6 +1007,10 @@ private enum TestFailure: Error {
     case timeout
 }
 
+private enum MockFailure: Error {
+    case publish
+}
+
 @MainActor
 private func eventually(
     timeout: Duration = .seconds(5),
@@ -920,4 +1047,18 @@ private func eventuallyAsync(
     }
 
     throw TestFailure.timeout
+}
+
+private func collectPublishFeedbackEvents(
+    from stream: AsyncStream<TranscriptPublishFeedbackEvent>,
+    count: Int
+) async -> [TranscriptPublishFeedbackEvent] {
+    var iterator = stream.makeAsyncIterator()
+    var events: [TranscriptPublishFeedbackEvent] = []
+
+    while events.count < count, let event = await iterator.next() {
+        events.append(event)
+    }
+
+    return events
 }

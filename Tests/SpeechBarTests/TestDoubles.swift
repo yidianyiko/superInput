@@ -145,14 +145,22 @@ struct MockCredentialProvider: CredentialProvider {
 actor MockTranscriptPublisher: TranscriptPublisher {
     private(set) var published: [PublishedTranscript] = []
     var outcome: TranscriptDeliveryOutcome = .publishedOnly
+    var error: Error?
 
     func publish(_ transcript: PublishedTranscript) async throws -> TranscriptDeliveryOutcome {
+        if let error {
+            throw error
+        }
         published.append(transcript)
         return outcome
     }
 
     func setOutcome(_ outcome: TranscriptDeliveryOutcome) {
         self.outcome = outcome
+    }
+
+    func setError(_ error: Error?) {
+        self.error = error
     }
 
     func snapshot() -> [PublishedTranscript] {
