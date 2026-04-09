@@ -72,6 +72,10 @@ final class TranscriptInjectionOverlayController: NSObject {
         switch event {
         case .started(let start):
             guard let target = await targetProvider.currentTranscriptInjectionTargetSnapshot() else {
+                scheduledHideTask?.cancel()
+                scheduledHideTask = nil
+                store.clear()
+                hidePanel()
                 return
             }
 

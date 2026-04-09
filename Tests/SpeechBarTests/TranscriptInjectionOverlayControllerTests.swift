@@ -305,6 +305,60 @@ struct TranscriptInjectionOverlayControllerTests {
         #expect(controller.activePublishIDForTesting == secondPublishID)
         #expect(controller.panelIsVisibleForTesting)
     }
+
+    @Test
+    @MainActor
+    func startedWithoutTargetSnapshotClearsPreviouslyVisibleOverlay() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let targetProvider = MutableTranscriptInjectionTargetSnapshotProvider()
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+        let controller = TranscriptInjectionOverlayController(
+            coordinator: coordinator,
+            targetProvider: targetProvider,
+            visibleDuration: .seconds(10)
+        )
+        let firstPublishID = UUID()
+
+        coordinator.publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: firstPublishID,
+                    transcript: PublishedTranscript(text: "ni hao")
+                )
+            )
+        )
+
+        try await eventually {
+            controller.activePublishIDForTesting == firstPublishID
+        }
+
+        targetProvider.snapshot = nil
+
+        coordinator.publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: UUID(),
+                    transcript: PublishedTranscript(text: "second")
+                )
+            )
+        )
+
+        try await Task.sleep(for: .milliseconds(150))
+
+        #expect(controller.activePublishIDForTesting == nil)
+        #expect(controller.panelIsVisibleForTesting == false)
+    }
 }
 
 @MainActor
@@ -346,6 +400,22 @@ private struct TranscriptInjectionOverlayTestDependencies {
     let coordinator: VoiceSessionCoordinator
     let targetProvider: MockTranscriptInjectionTargetSnapshotProvider
     let targetSnapshot: TranscriptInjectionTargetSnapshot?
+}
+
+private final class MutableTranscriptInjectionTargetSnapshotProvider: TranscriptInjectionTargetSnapshotProviding, @unchecked Sendable {
+    var snapshot: TranscriptInjectionTargetSnapshot? = TranscriptInjectionTargetSnapshot(
+        processIdentifier: 4242,
+        appIdentifier: "com.apple.TextEdit",
+        appName: "TextEdit",
+        screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+        windowFrame: CGRect(x: 180, y: 160, width: 820, height: 520),
+        elementFrame: CGRect(x: 260, y: 260, width: 360, height: 44),
+        destinationPoint: CGPoint(x: 440, y: 282)
+    )
+
+    func currentTranscriptInjectionTargetSnapshot() async -> TranscriptInjectionTargetSnapshot? {
+        snapshot
+    }
 }
 
 private enum TestFailure: Error {
