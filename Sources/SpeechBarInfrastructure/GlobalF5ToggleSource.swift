@@ -25,8 +25,16 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
     private var eventHandlerRef: EventHandlerRef?
     private var isRecordingActive = false
 
-    private static let hotKeyHandler: EventHandlerUPP = { _, _, _ in
-        noErr
+    private static let hotKeyHandler: EventHandlerUPP = { _, _, userData in
+        guard let userData else {
+            return noErr
+        }
+
+        let source = Unmanaged<GlobalShortcutToggleSource>
+            .fromOpaque(userData)
+            .takeUnretainedValue()
+        source.handleHotKeyPress()
+        return noErr
     }
 
     public init(
@@ -49,7 +57,7 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         let hotKeyID = EventHotKeyID(signature: 0x53505348, id: 1)
         let installStatus = registrar.installHandler(
             Self.hotKeyHandler,
-            userData: nil,
+            userData: Unmanaged.passUnretained(self).toOpaque(),
             eventHandlerRef: &eventHandlerRef
         )
 
@@ -88,6 +96,10 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
     }
 
     func handleHotKeyPressForTesting() {
+        handleHotKeyPress()
+    }
+
+    private func handleHotKeyPress() {
         isRecordingActive.toggle()
         let event = HardwareEvent(
             source: .globalShortcut,

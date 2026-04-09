@@ -37,6 +37,24 @@ struct GlobalShortcutToggleSourceTests {
         let events = source.eventsForTesting(limit: 2)
         #expect(events.map(\.kind) == [.pushToTalkPressed, .pushToTalkReleased])
     }
+
+    @Test
+    func routesRegisteredHandlerInvocationsBackToTheSource() {
+        let registrar = MockGlobalHotKeyRegistrar(registerStatus: noErr)
+        let source = GlobalShortcutToggleSource(
+            combination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_R),
+                modifiers: UInt32(controlKey | optionKey | cmdKey)
+            ),
+            registrar: registrar
+        )
+
+        registrar.invokeInstalledHandler()
+        registrar.invokeInstalledHandler()
+
+        let events = source.eventsForTesting(limit: 2)
+        #expect(events.map(\.kind) == [.pushToTalkPressed, .pushToTalkReleased])
+    }
 }
 
 final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
@@ -48,6 +66,8 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
     private(set) var removeHandlerCallCount = 0
     private(set) var registeredKeyCode: UInt32?
     private(set) var registeredModifiers: UInt32?
+    private var installedHandler: EventHandlerUPP?
+    private var installedUserData: UnsafeMutableRawPointer?
 
     init(installStatus: OSStatus = noErr, registerStatus: OSStatus) {
         self.installStatus = installStatus
@@ -60,6 +80,8 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
         eventHandlerRef: inout EventHandlerRef?
     ) -> OSStatus {
         installHandlerCallCount += 1
+        installedHandler = handler
+        installedUserData = userData
         return installStatus
     }
 
@@ -76,5 +98,9 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
 
     func removeHandler(_ eventHandlerRef: EventHandlerRef?) {
         removeHandlerCallCount += 1
+    }
+
+    func invokeInstalledHandler() {
+        _ = installedHandler?(nil, nil, installedUserData)
     }
 }
