@@ -247,15 +247,21 @@ struct MockFocusedInputSnapshotProvider: FocusedInputSnapshotProviding {
 }
 
 struct MockTranscriptInjectionTargetSnapshotProvider: TranscriptInjectionTargetSnapshotProviding {
-    var snapshot: TranscriptInjectionTargetSnapshot? = TranscriptInjectionTargetSnapshot(
-        processIdentifier: 4242,
-        appIdentifier: "com.apple.TextEdit",
-        appName: "TextEdit",
-        screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900),
-        windowFrame: CGRect(x: 180, y: 160, width: 820, height: 520),
-        elementFrame: CGRect(x: 260, y: 260, width: 360, height: 44),
-        destinationPoint: CGPoint(x: 440, y: 282)
-    )
+    var snapshot: TranscriptInjectionTargetSnapshot?
+
+    init(
+        snapshot: TranscriptInjectionTargetSnapshot? = TranscriptInjectionTargetSnapshot(
+            processIdentifier: 4242,
+            appIdentifier: "com.apple.TextEdit",
+            appName: "TextEdit",
+            screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+            windowFrame: CGRect(x: 180, y: 160, width: 820, height: 520),
+            elementFrame: CGRect(x: 260, y: 260, width: 360, height: 44),
+            destinationPoint: CGPoint(x: 440, y: 282)
+        )
+    ) {
+        self.snapshot = snapshot
+    }
 
     func currentTranscriptInjectionTargetSnapshot() async -> TranscriptInjectionTargetSnapshot? {
         snapshot
