@@ -9,7 +9,6 @@ struct MemoryConstellationCanvasView: View {
     let focus: MemoryConstellationFocus
     let selectedViewMode: MemoryConstellationViewMode
     let capturePulseToken: Int
-    let pointerVector: CGPoint
     let activationProgress: CGFloat
     let hoverCluster: (MemoryConstellationClusterKind?) -> Void
     let focusBridge: (UUID?) -> Void
@@ -28,63 +27,56 @@ struct MemoryConstellationCanvasView: View {
         MemoryConstellationPanel(padding: 16) {
             GeometryReader { proxy in
                 let size = proxy.size
-                TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: reduceMotion)) { context in
-                    let phase = context.date.timeIntervalSinceReferenceDate
-                    let fieldOffset = reduceMotion ? CGSize.zero : MemoryConstellationMotion.parallaxOffset(pointerVector: pointerVector, maxX: 26, maxY: 18)
-                    let constellationOffset = reduceMotion ? CGSize.zero : MemoryConstellationMotion.parallaxOffset(pointerVector: pointerVector, maxX: 14, maxY: 10)
-                    let cardOffset = reduceMotion ? CGSize.zero : MemoryConstellationMotion.parallaxOffset(pointerVector: pointerVector, maxX: 9, maxY: 6)
+                let introPhase = TimeInterval((1 - activationProgress) * 3.6)
+                let showcaseVector = reduceMotion
+                    ? CGPoint.zero
+                    : MemoryConstellationMotion.showcasePointer(
+                        phase: introPhase,
+                        activationProgress: activationProgress
+                    )
+                let fieldOffset = reduceMotion ? CGSize.zero : MemoryConstellationMotion.parallaxOffset(pointerVector: showcaseVector, maxX: 16, maxY: 12)
+                let constellationOffset = reduceMotion ? CGSize.zero : MemoryConstellationMotion.parallaxOffset(pointerVector: showcaseVector, maxX: 8, maxY: 6)
 
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(constellationTheme.canvasBackground)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(constellationTheme.canvasBackground)
 
-                        energyField(size: size, phase: phase)
-                            .offset(fieldOffset)
+                    energyField(size: size, phase: introPhase)
+                        .offset(fieldOffset)
 
-                        ambientGrid(size: size, phase: phase)
-                            .offset(fieldOffset)
+                    ambientGrid(size: size, phase: introPhase)
+                        .offset(fieldOffset)
 
-                        captureWave(size: size)
+                    captureWave(size: size)
 
-                        Group {
-                            ForEach(Array(snapshot.highlightedBridges.enumerated()), id: \.element.id) { index, bridge in
-                                bridgeLayer(bridge, bridgeIndex: index, size: size, phase: phase)
-                            }
-
-                            ForEach(snapshot.clusters) { cluster in
-                                clusterLayer(cluster, size: size, phase: phase)
-                            }
+                    Group {
+                        ForEach(Array(snapshot.highlightedBridges.enumerated()), id: \.element.id) { index, bridge in
+                            bridgeLayer(bridge, bridgeIndex: index, size: size)
                         }
-                        .offset(constellationOffset)
 
-                        VStack {
-                            HStack(alignment: .top, spacing: 10) {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    ForEach(snapshot.guidanceCards) { card in
-                                        guidanceCard(card)
-                                    }
-                                }
-                                Spacer()
-                            }
-                            Spacer()
+                        ForEach(snapshot.clusters) { cluster in
+                            clusterLayer(cluster, size: size)
                         }
-                        .padding(18)
-                        .offset(cardOffset)
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(constellationTheme.surfaceStroke, lineWidth: 1)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(
-                                constellationTheme.focusAccent.opacity(0.32 * capturePulseProgress),
-                                lineWidth: 1 + (capturePulseProgress * 3)
-                            )
-                            .blur(radius: capturePulseProgress * 1.2)
-                    )
+                    .offset(constellationOffset)
+
+                    guidanceCardsOverlay
+                        .padding(18)
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(constellationTheme.surfaceStroke, lineWidth: 1)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(
+                            constellationTheme.focusAccent.opacity(0.32 * capturePulseProgress),
+                            lineWidth: 1 + (capturePulseProgress * 3)
+                        )
+                        .blur(radius: capturePulseProgress * 1.2)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             }
             .frame(minHeight: 470)
         }
@@ -106,12 +98,26 @@ struct MemoryConstellationCanvasView: View {
         }
     }
 
+    private var guidanceCardsOverlay: some View {
+        VStack {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(snapshot.guidanceCards) { card in
+                        guidanceCard(card)
+                    }
+                }
+                Spacer()
+            }
+            Spacer()
+        }
+    }
+
     private func ambientGrid(size: CGSize, phase: TimeInterval) -> some View {
         ZStack {
-            ForEach(0..<36, id: \.self) { index in
+            ForEach(0..<16, id: \.self) { index in
                 Circle()
                     .fill(ambientParticleColor(index: index).opacity(MemoryConstellationMotion.ambientOpacity(index: index, phase: phase)))
-                    .frame(width: index.isMultiple(of: 4) ? 5 : 2.4, height: index.isMultiple(of: 4) ? 5 : 2.4)
+                    .frame(width: index.isMultiple(of: 4) ? 4 : 2.2, height: index.isMultiple(of: 4) ? 4 : 2.2)
                     .position(
                         x: size.width * ambientX(for: index),
                         y: size.height * ambientY(for: index)
@@ -125,16 +131,21 @@ struct MemoryConstellationCanvasView: View {
     private func bridgeLayer(
         _ bridge: MemoryConstellationBridge,
         bridgeIndex: Int,
-        size: CGSize,
-        phase: TimeInterval
+        size: CGSize
     ) -> some View {
         let from = point(for: bridge.from, size: size)
         let to = point(for: bridge.to, size: size)
         let midpoint = CGPoint(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
         let focused = bridge.isFocused || focus == .bridge(bridge.id)
-        let lift = reduceMotion ? 0 : MemoryConstellationMotion.bridgeLift(bridgeIndex: bridgeIndex, phase: phase)
         let pulseBoost = capturePulseProgress * 1.2
-        let activation = max(0.28, min(1, Double(activationProgress) * 1.25 - Double(bridgeIndex) * 0.12))
+        let activation = max(0.32, min(1, Double(activationProgress) * 1.18))
+        let chaosOffset = reduceMotion
+            ? .zero
+            : MemoryConstellationMotion.chaosBridgeOffset(
+                bridgeIndex: bridgeIndex,
+                activationProgress: activationProgress
+            )
+        let controlLift = (focused ? 84 : 54) + (chaosOffset.height * 0.65)
 
         return ZStack {
             Path { path in
@@ -142,8 +153,8 @@ struct MemoryConstellationCanvasView: View {
                 path.addQuadCurve(
                     to: to,
                     control: CGPoint(
-                        x: midpoint.x,
-                        y: min(from.y, to.y) - (focused ? 84 : 54) - (lift * 0.5)
+                        x: midpoint.x + (chaosOffset.width * 0.35),
+                        y: min(from.y, to.y) - controlLift
                     )
                 )
             }
@@ -156,40 +167,9 @@ struct MemoryConstellationCanvasView: View {
                     startPoint: .leading,
                     endPoint: .trailing
                 ),
-                style: StrokeStyle(lineWidth: (focused ? 4 : 2) + (lift * 0.05) + pulseBoost, lineCap: .round, dash: focused ? [] : [8, 8])
+                style: StrokeStyle(lineWidth: (focused ? 3.6 : 1.9) + pulseBoost, lineCap: .round, dash: focused ? [] : [8, 8])
             )
-            .shadow(color: constellationTheme.accent.opacity((focused ? 0.42 : 0.18) + (capturePulseProgress * 0.16)), radius: (focused ? 10 : 4) + (lift * 0.18) + (capturePulseProgress * 5))
-            .accessibilityHidden(true)
-
-            Path { path in
-                path.move(to: from)
-                path.addQuadCurve(
-                    to: to,
-                    control: CGPoint(
-                        x: midpoint.x,
-                        y: min(from.y, to.y) - (focused ? 84 : 54) - (lift * 0.5)
-                    )
-                )
-            }
-            .stroke(
-                LinearGradient(
-                    colors: [
-                        Color.clear,
-                        constellationTheme.focusAccent.opacity(0.85 * activation),
-                        Color.clear
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                style: StrokeStyle(
-                    lineWidth: (focused ? 2.8 : 1.8) + (capturePulseProgress * 1.6),
-                    lineCap: .round,
-                    dash: [18, 44],
-                    dashPhase: -MemoryConstellationMotion.bridgeEnergyPhase(bridgeIndex: bridgeIndex, phase: phase)
-                )
-            )
-            .blendMode(.screen)
-            .opacity(0.92)
+            .shadow(color: constellationTheme.accent.opacity((focused ? 0.30 : 0.14) + (capturePulseProgress * 0.14)), radius: (focused ? 8 : 3) + (capturePulseProgress * 4))
             .accessibilityHidden(true)
 
             Button {
@@ -215,7 +195,10 @@ struct MemoryConstellationCanvasView: View {
                 )
             }
             .buttonStyle(.plain)
-            .position(x: midpoint.x, y: midpoint.y - (focused ? 28 : 10) - lift)
+            .position(
+                x: midpoint.x + chaosOffset.width,
+                y: midpoint.y - (focused ? 24 : 8) + chaosOffset.height
+            )
             .accessibilityLabel(Text(bridgeAccessibilityLabel(for: bridge, focused: focused)))
             .accessibilityHint(Text(focused ? "点按可返回星图总览。" : "点按可在画布中聚焦这条连接。"))
         }
@@ -223,23 +206,22 @@ struct MemoryConstellationCanvasView: View {
 
     private func clusterLayer(
         _ cluster: MemoryConstellationCluster,
-        size: CGSize,
-        phase: TimeInterval
+        size: CGSize
     ) -> some View {
         let anchor = point(for: cluster.kind, size: size)
         let focused = isClusterFocused(cluster)
         let radius: CGFloat = focused ? 172 : 150
         let opacity = cluster.isDimmed ? 0.34 : 1.0
-        let breath = reduceMotion ? 0 : MemoryConstellationMotion.clusterBreath(cluster: cluster.kind, phase: phase)
-        let pulseScale = 1 + (capturePulseProgress * (focused ? 0.08 : 0.05))
-        let activationScale = 0.84 + (activationProgress * 0.16)
+        let pulseScale = 1 + (capturePulseProgress * (focused ? 0.07 : 0.04))
+        let activationScale = 0.78 + (activationProgress * 0.22)
+        let ringVisible = focused || capturePulseProgress > 0.01
 
         return ZStack {
             Circle()
                 .fill(constellationTheme.clusterGlow(for: cluster.kind, emphasis: cluster.emphasis))
                 .frame(width: radius * 2, height: radius * 2)
-                .scaleEffect((1 + breath) * pulseScale * activationScale)
-                .blur(radius: focused ? 10 : 18)
+                .scaleEffect(pulseScale * activationScale)
+                .blur(radius: focused ? 8 : 14)
                 .accessibilityHidden(true)
 
             Circle()
@@ -247,36 +229,36 @@ struct MemoryConstellationCanvasView: View {
                 .frame(width: radius * 1.18, height: radius * 1.18)
                 .accessibilityHidden(true)
 
-            Circle()
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            Color.clear,
-                            constellationTheme.clusterColor(for: cluster.kind).opacity(0.18),
-                            constellationTheme.focusAccent.opacity(focused ? 0.82 : 0.54),
-                            Color.clear
-                        ],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: focused ? 3.4 : 2.2, lineCap: .round, dash: [18, 24])
-                )
-                .frame(width: radius * 1.50, height: radius * 1.50)
-                .scaleEffect(MemoryConstellationMotion.energyRingScale(
-                    cluster: cluster.kind,
-                    phase: phase,
-                    activationProgress: activationProgress
-                ) + (capturePulseProgress * 0.12))
-                .rotationEffect(.degrees(MemoryConstellationMotion.energyRingRotation(cluster: cluster.kind, phase: phase)))
-                .blur(radius: focused ? 0.8 : 1.4)
-                .opacity((focused ? 0.95 : 0.68) * activationProgress)
-                .accessibilityHidden(true)
+            if ringVisible {
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            colors: [
+                                Color.clear,
+                                constellationTheme.clusterColor(for: cluster.kind).opacity(0.18),
+                                constellationTheme.focusAccent.opacity(focused ? 0.82 : 0.54),
+                                Color.clear
+                            ],
+                            center: .center
+                        ),
+                        style: StrokeStyle(lineWidth: focused ? 2.4 : 1.8, lineCap: .round, dash: [18, 24])
+                    )
+                    .frame(width: radius * 1.50, height: radius * 1.50)
+                    .scaleEffect(1 + (capturePulseProgress * 0.08))
+                    .opacity((focused ? 0.92 : 0.56) * activationProgress)
+                    .accessibilityHidden(true)
+            }
 
             ForEach(Array(cluster.stars.enumerated()), id: \.element.id) { index, star in
-                let starOffset = reduceMotion
+                let chaosOffset = reduceMotion
                     ? .zero
-                    : MemoryConstellationMotion.starOffset(cluster: cluster.kind, starIndex: index, phase: phase)
-                let trailOffset = CGSize(width: starOffset.width * -0.32, height: starOffset.height * -0.32)
+                    : MemoryConstellationMotion.chaosStarOffset(
+                        cluster: cluster.kind,
+                        starIndex: index,
+                        activationProgress: activationProgress
+                    )
                 let isSelected = selectedStarID == star.id
+                let glowTrailVisible = isSelected || star.isRecentlyAdded || capturePulseProgress > 0.01
                 Button {
                     focusStar(isSelected ? nil : star.id)
                 } label: {
@@ -288,15 +270,17 @@ struct MemoryConstellationCanvasView: View {
                                 height: max(24, starDiameter(star, selected: isSelected) + 12)
                             )
 
-                        Circle()
-                            .fill(starColor(for: cluster.kind, focused: focused, selected: isSelected).opacity(isSelected ? 0.34 : 0.18))
-                            .frame(
+                        if glowTrailVisible {
+                            Circle()
+                                .fill(starColor(for: cluster.kind, focused: focused, selected: isSelected).opacity(isSelected ? 0.34 : 0.18))
+                                .frame(
                                 width: starDiameter(star, selected: isSelected) + 10,
                                 height: starDiameter(star, selected: isSelected) + 10
                             )
-                            .blur(radius: 7)
-                            .offset(trailOffset)
-                            .scaleEffect(1 + (capturePulseProgress * 0.16))
+                                .blur(radius: 5)
+                                .offset(x: chaosOffset.width * -0.18, y: chaosOffset.height * -0.18)
+                                .scaleEffect(1 + (capturePulseProgress * 0.12))
+                        }
 
                         Circle()
                             .fill(starColor(for: cluster.kind, focused: focused, selected: isSelected))
@@ -313,19 +297,10 @@ struct MemoryConstellationCanvasView: View {
                                         height: starDiameter(star, selected: isSelected) + 8
                                     )
                             )
-                            .shadow(color: Color.white.opacity(isSelected ? 0.40 : (focused ? 0.32 : 0.18)), radius: isSelected ? 10 : (focused ? 7 : 3))
-                            .scaleEffect(
-                                reduceMotion
-                                    ? 1
-                                    : MemoryConstellationMotion.starScale(cluster: cluster.kind, starIndex: index, phase: phase)
-                            )
-                            .scaleEffect(1 + (capturePulseProgress * 0.16))
+                            .shadow(color: Color.white.opacity(isSelected ? 0.32 : (focused ? 0.22 : 0.10)), radius: isSelected ? 8 : (focused ? 5 : 2))
+                            .scaleEffect(1 + (capturePulseProgress * 0.12))
                             .scaleEffect(activationScale)
-                            .opacity(
-                                reduceMotion
-                                    ? (isSelected ? 1 : 0.88)
-                                    : MemoryConstellationMotion.starOpacity(cluster: cluster.kind, starIndex: index, phase: phase)
-                            )
+                            .opacity(isSelected ? 1 : (0.74 + (activationProgress * 0.18)))
 
                         if star.isRecentlyAdded {
                             Text("新")
@@ -344,8 +319,8 @@ struct MemoryConstellationCanvasView: View {
                 }
                 .buttonStyle(.plain)
                 .position(
-                    x: starPosition(index: index, around: anchor, radius: radius * 0.50).x + starOffset.width,
-                    y: starPosition(index: index, around: anchor, radius: radius * 0.50).y + starOffset.height
+                    x: starPosition(index: index, around: anchor, radius: radius * 0.50).x + chaosOffset.width,
+                    y: starPosition(index: index, around: anchor, radius: radius * 0.50).y + chaosOffset.height
                 )
                 .accessibilityLabel(Text(accessibilityLabel(for: star, selected: isSelected)))
                 .accessibilityHint(Text("点按可查看这条真实记忆的详情。"))
@@ -394,7 +369,7 @@ struct MemoryConstellationCanvasView: View {
             Ellipse()
                 .fill(constellationTheme.focusAccent.opacity(0.12))
                 .frame(width: size.width * 0.68, height: size.height * 0.42)
-                .blur(radius: 42)
+                .blur(radius: 22)
                 .offset(
                     x: cos(phase * 0.18) * 24,
                     y: sin(phase * 0.24) * 18
@@ -403,7 +378,7 @@ struct MemoryConstellationCanvasView: View {
             Ellipse()
                 .fill(constellationTheme.accent.opacity(0.10))
                 .frame(width: size.width * 0.52, height: size.height * 0.30)
-                .blur(radius: 30)
+                .blur(radius: 16)
                 .offset(
                     x: sin(phase * 0.22) * -28,
                     y: cos(phase * 0.20) * 16

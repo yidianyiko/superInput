@@ -27,6 +27,98 @@ enum MemoryConstellationMotion {
         )
     }
 
+    static func quantizedPointer(_ pointer: CGPoint, step: CGFloat = 0.08) -> CGPoint {
+        guard step > 0 else {
+            return CGPoint(
+                x: clamp(pointer.x, min: -1, max: 1),
+                y: clamp(pointer.y, min: -1, max: 1)
+            )
+        }
+
+        func quantize(_ value: CGFloat) -> CGFloat {
+            let clamped = clamp(value, min: -1, max: 1)
+            return (clamped / step).rounded() * step
+        }
+
+        return CGPoint(
+            x: quantize(pointer.x),
+            y: quantize(pointer.y)
+        )
+    }
+
+    static func showcasePointer(
+        phase: TimeInterval,
+        activationProgress: CGFloat
+    ) -> CGPoint {
+        let remaining = max(0, 1 - activationProgress)
+        guard remaining > 0.001 else {
+            return .zero
+        }
+
+        let envelope = remaining * remaining
+        return CGPoint(
+            x: CGFloat(sin(phase * 1.9)) * 0.34 * envelope,
+            y: CGFloat(cos((phase * 1.5) + 0.8)) * 0.24 * envelope
+        )
+    }
+
+    static func chaosStarOffset(
+        cluster: MemoryConstellationClusterKind,
+        starIndex: Int,
+        activationProgress: CGFloat
+    ) -> CGSize {
+        let remaining = max(0, 1 - activationProgress)
+        guard remaining > 0.001 else {
+            return .zero
+        }
+
+        let seed = cluster.motionSeed + Double(starIndex) * 1.17
+        let envelope = Double(remaining * remaining)
+        let horizontal = sin((1 - Double(activationProgress)) * 10.4 + (seed * 1.8))
+            + (cos((1 - Double(activationProgress)) * 18.6 + (seed * 0.9)) * 0.42)
+        let vertical = cos((1 - Double(activationProgress)) * 9.1 + (seed * 1.5))
+            + (sin((1 - Double(activationProgress)) * 20.8 + (seed * 0.7)) * 0.36)
+        let horizontalAmplitude = 34.0 + Double(starIndex % 3) * 12.0
+        let verticalAmplitude = 28.0 + Double((starIndex + 1) % 4) * 10.0
+
+        return CGSize(
+            width: horizontal * horizontalAmplitude * envelope,
+            height: vertical * verticalAmplitude * envelope
+        )
+    }
+
+    static func chaosBridgeOffset(
+        bridgeIndex: Int,
+        activationProgress: CGFloat
+    ) -> CGSize {
+        let remaining = max(0, 1 - activationProgress)
+        guard remaining > 0.001 else {
+            return .zero
+        }
+
+        let seed = Double(bridgeIndex) * 1.31
+        let envelope = Double(remaining * remaining)
+        return CGSize(
+            width: sin((1 - Double(activationProgress)) * 8.6 + seed) * 18 * envelope,
+            height: cos((1 - Double(activationProgress)) * 7.4 + (seed * 1.4)) * 14 * envelope
+        )
+    }
+
+    static func shouldAnimateTimeline(
+        reduceMotion: Bool,
+        capturePulseProgress: CGFloat,
+        activationProgress: CGFloat
+    ) -> Bool {
+        guard reduceMotion == false else {
+            return false
+        }
+
+        let pulseActive = capturePulseProgress > 0.001
+        let activationActive = activationProgress < 0.999
+
+        return pulseActive || activationActive
+    }
+
     static func starOffset(
         cluster: MemoryConstellationClusterKind,
         starIndex: Int,
