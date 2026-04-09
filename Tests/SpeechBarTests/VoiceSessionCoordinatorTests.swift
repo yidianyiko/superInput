@@ -108,9 +108,52 @@ struct VoiceSessionCoordinatorTests {
             return
         }
 
-        #expect(started.transcript.text == "ni hao")
         #expect(completed.outcome == .pasteShortcutSent)
         #expect(started.publishID == completed.publishID)
+    }
+
+    @Test
+    @MainActor
+    func publishFeedbackNotifierEmitsStartedEventWhenCaptureBeginsFinalizing() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        let eventTask = Task {
+            try await collectPublishFeedbackEvents(
+                from: coordinator.publishFeedbackNotifier.events,
+                count: 1
+            )
+        }
+
+        coordinator.start()
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        coordinator.finalizeCaptureFromOverlay()
+
+        let events = try await eventTask.value
+        #expect(events.count == 1)
+
+        guard case .started = events[0] else {
+            Issue.record("Expected started event while finalizing.")
+            return
+        }
     }
 
     @Test
@@ -335,6 +378,90 @@ struct VoiceSessionCoordinatorTests {
             }
             return false
         }
+    }
+
+    @Test
+    @MainActor
+    func usbPushToTalkPressTogglesRecordingWhileReleaseIsIgnored() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pushToTalkReleased))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(coordinator.sessionState == .recording)
+        #expect(client.finalizeCallCount == 0)
+
+        audio.emit(AudioChunk(data: Data([0x01, 0x02]), format: .deepgramLinear16, sequenceNumber: 0))
+        client.emit(.final("ni hao"))
+
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pushToTalkPressed))
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pushToTalkReleased))
+        client.emit(.utteranceEnded)
+
+        try await eventually {
+            coordinator.sessionState == .idle && coordinator.finalTranscript == "ni hao"
+        }
+
+        let published = await publisher.snapshot()
+        #expect(published.map(\.text) == ["ni hao"])
+        #expect(client.finalizeCallCount == 1)
+    }
+
+    @Test
+    @MainActor
+    func finalizeTimeoutUsesInjectedSleepClock() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        client.finalizeDelay = .seconds(1)
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ThrowingSleepClock(error: TestFailure.timeout)
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        hardware.send(HardwareEvent(source: .onScreenButton, kind: .pushToTalkReleased))
+
+        try await eventually(timeout: .milliseconds(200)) {
+            if case .failed(let message) = coordinator.sessionState {
+                return message == "无法完成本次转写。"
+            }
+            return false
+        }
+
+        #expect(client.finalizeCallCount == 1)
     }
 
     @Test

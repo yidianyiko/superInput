@@ -3,11 +3,15 @@ import SpeechBarDomain
 import SwiftUI
 
 struct MemoryConstellationScreen: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @ObservedObject var constellationStore: MemoryConstellationStore
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var memoryFeatureFlagStore: MemoryFeatureFlagStore
     let palette: HomeWindowStore.HomeThemePalette
     let completedTranscript: PublishedTranscript?
+
+    @State private var activationProgress: CGFloat = 0
 
     private var constellationTheme: MemoryConstellationVisualTheme {
         MemoryConstellationVisualTheme(palette: palette)
@@ -34,6 +38,7 @@ struct MemoryConstellationScreen: View {
                 focus: constellationStore.focus,
                 selectedViewMode: constellationStore.selectedViewMode,
                 capturePulseToken: constellationStore.capturePulseToken,
+                activationProgress: activationProgress,
                 hoverCluster: constellationStore.hoverCluster,
                 focusBridge: constellationStore.focusBridge,
                 focusStar: constellationStore.focusStar
@@ -87,6 +92,21 @@ struct MemoryConstellationScreen: View {
         .task {
             await constellationStore.reload()
         }
+        .onAppear {
+            guard !reduceMotion else {
+                activationProgress = 1
+                return
+            }
+
+            activationProgress = 0
+
+            Task { @MainActor in
+                await Task.yield()
+                withAnimation(.easeOut(duration: 1.4)) {
+                    activationProgress = 1
+                }
+            }
+        }
         .onChange(of: memoryFeatureFlagStore.displayMode) { _ in
             constellationStore.refreshPresentation()
         }
@@ -101,29 +121,44 @@ struct MemoryConstellationScreen: View {
     }
 
     private var screenBackground: some View {
-        ZStack {
+        return ZStack {
             RoundedRectangle(cornerRadius: 34, style: .continuous)
                 .fill(constellationTheme.canvasBackground)
 
             RadialGradient(
                 colors: [
-                    constellationTheme.clusterColor(for: .vocabulary).opacity(0.18),
+                    constellationTheme.clusterColor(for: .vocabulary).opacity(0.24 + ((1 - activationProgress) * 0.12)),
                     Color.clear
                 ],
                 center: .topLeading,
                 startRadius: 30,
-                endRadius: 320
+                endRadius: 360
             )
 
             RadialGradient(
                 colors: [
-                    constellationTheme.clusterColor(for: .style).opacity(0.12),
+                    constellationTheme.clusterColor(for: .style).opacity(0.18 + ((1 - activationProgress) * 0.10)),
                     Color.clear
                 ],
                 center: .bottomTrailing,
                 startRadius: 30,
-                endRadius: 300
+                endRadius: 340
             )
+
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            constellationTheme.focusAccent.opacity(0.16),
+                            Color.clear
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 820, height: 320)
+                .blur(radius: 32)
+                .offset(x: 42, y: -24)
         }
     }
 }

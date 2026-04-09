@@ -432,7 +432,7 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
 
         let applicationElement = AXUIElementCreateApplication(processIdentifier)
         let element = focusedElement(processIdentifier: processIdentifier)
-        let windowElement = element.flatMap(windowElement(for:))
+        let windowElement = element.flatMap(windowElement(for:)) ?? focusedWindow(in: applicationElement)
         let bundleIdentifier = applicationTracker.application(processIdentifier: processIdentifier)?.bundleIdentifier ?? "unknown"
         let capturedTarget = CapturedFocusTarget(
             processIdentifier: processIdentifier,
@@ -475,7 +475,7 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
         }
 
         let applicationElement = AXUIElementCreateApplication(processIdentifier)
-        let windowElement = windowElement(for: focusedElement)
+        let windowElement = windowElement(for: focusedElement) ?? focusedWindow(in: applicationElement)
         let bundleIdentifier = applicationTracker.application(processIdentifier: processIdentifier)?.bundleIdentifier ?? "unknown"
         let capturedTarget = CapturedFocusTarget(
             processIdentifier: processIdentifier,
@@ -501,6 +501,35 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
 
         guard status == .success else { return nil }
         return (focusedValue as! AXUIElement)
+    }
+
+    @MainActor
+    private func focusedWindow(in applicationElement: AXUIElement) -> AXUIElement? {
+        var focusedValue: CFTypeRef?
+        let focusedStatus = AXUIElementCopyAttributeValue(
+            applicationElement,
+            kAXFocusedWindowAttribute as CFString,
+            &focusedValue
+        )
+        if focusedStatus == .success,
+           let focusedValue,
+           CFGetTypeID(focusedValue) == AXUIElementGetTypeID() {
+            return (focusedValue as! AXUIElement)
+        }
+
+        var mainValue: CFTypeRef?
+        let mainStatus = AXUIElementCopyAttributeValue(
+            applicationElement,
+            kAXMainWindowAttribute as CFString,
+            &mainValue
+        )
+        if mainStatus == .success,
+           let mainValue,
+           CFGetTypeID(mainValue) == AXUIElementGetTypeID() {
+            return (mainValue as! AXUIElement)
+        }
+
+        return nil
     }
 
     @MainActor

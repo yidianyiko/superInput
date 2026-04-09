@@ -241,7 +241,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
     }
 
     private func handleHardwareEvent(_ event: HardwareEvent) async {
-        switch mapAppIntent(from: event) {
+        guard let intent = mapNormalizedAppIntent(from: event) else {
+            return
+        }
+
+        switch intent {
         case .startVoiceCapture:
             await beginVoiceCapture()
         case .stopVoiceCapture:
@@ -250,6 +254,41 @@ public final class VoiceSessionCoordinator: ObservableObject {
             await switchWindow(direction)
         case .pressReturnKey:
             returnKeyHandler()
+        }
+    }
+
+    private func mapNormalizedAppIntent(from event: HardwareEvent) -> AppIntent? {
+        if usesRawPushToTalkToggleSemantics(event.source) {
+            switch event.kind {
+            case .pushToTalkPressed:
+                return isVoiceCaptureFlowActive
+                    ? .stopVoiceCapture(source: event.source)
+                    : .startVoiceCapture(source: event.source)
+            case .pushToTalkReleased:
+                return nil
+            default:
+                break
+            }
+        }
+
+        return mapAppIntent(from: event)
+    }
+
+    private var isVoiceCaptureFlowActive: Bool {
+        switch sessionState {
+        case .requestingPermission, .connecting, .recording, .finalizing:
+            return true
+        case .idle, .failed:
+            return false
+        }
+    }
+
+    private func usesRawPushToTalkToggleSemantics(_ source: HardwareSourceKind) -> Bool {
+        switch source {
+        case .usbHID, .usbRotaryKnob:
+            return true
+        case .onScreenButton, .globalSpaceKey, .globalShortcut, .globalRightCommandKey, .keyboardRotaryTest:
+            return false
         }
     }
 
@@ -439,6 +478,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         activeFinalizeStartedAt = Date()
         overlayPhase = .finalizing
         overlaySubtitle = "转写中"
+        beginPublishFeedbackIfNeeded()
         if let activeSessionStartedAt {
             performanceLog(
                 "finalize started, captureDuration=\(String(format: "%.3f", Date().timeIntervalSince(activeSessionStartedAt)))s"
@@ -576,20 +616,11 @@ public final class VoiceSessionCoordinator: ObservableObject {
             let endedAt = activeFinalizeStartedAt ?? completedAt
             return max(0, endedAt.timeIntervalSince(startedAt))
         }
-        let publishFeedbackID = UUID()
-        activePublishFeedbackID = publishFeedbackID
+        let publishFeedbackID = beginPublishFeedbackIfNeeded()
         let deliveryOutcome: TranscriptDeliveryOutcome
         do {
             overlayPhase = .publishing
             overlaySubtitle = isStreamingInterimPublishingActive ? "更新中" : "粘贴中"
-            publishFeedbackNotifier.notify(
-                .started(
-                    TranscriptPublishFeedbackStart(
-                        publishID: publishFeedbackID,
-                        transcript: publishedTranscript
-                    )
-                )
-            )
             let publishStartedAt = Date()
             if isStreamingInterimPublishingActive, let streamingTranscriptPublisher {
                 deliveryOutcome = try await streamingTranscriptPublisher.finishStreamingSession(
@@ -611,14 +642,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 "publish finished, publishLatency=\(String(format: "%.3f", Date().timeIntervalSince(publishStartedAt)))s"
             )
         } catch {
-            if let activePublishFeedbackID {
-                publishFeedbackNotifier.notify(
-                    .failed(
-                        TranscriptPublishFeedbackFailure(publishID: activePublishFeedbackID)
-                    )
-                )
-            }
-            self.activePublishFeedbackID = nil
+            notifyPublishFeedbackFailureIfNeeded()
             await teardownActiveSession()
             sessionState = .idle
             overlayPhase = .hidden
@@ -663,6 +687,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     }
 
     private func failActiveSession(message: String) async {
+        notifyPublishFeedbackFailureIfNeeded()
         await teardownActiveSession()
         sessionState = .failed(message)
         statusMessage = message
@@ -671,6 +696,37 @@ public final class VoiceSessionCoordinator: ObservableObject {
         audioLevelWindow = []
         lastAudioLevelWindowUpdateAt = nil
         activeInputHints = []
+    }
+
+    @discardableResult
+    private func beginPublishFeedbackIfNeeded() -> UUID {
+        if let activePublishFeedbackID {
+            return activePublishFeedbackID
+        }
+
+        let publishFeedbackID = UUID()
+        activePublishFeedbackID = publishFeedbackID
+        publishFeedbackNotifier.notify(
+            .started(
+                TranscriptPublishFeedbackStart(
+                    publishID: publishFeedbackID
+                )
+            )
+        )
+        return publishFeedbackID
+    }
+
+    private func notifyPublishFeedbackFailureIfNeeded() {
+        guard let activePublishFeedbackID else {
+            return
+        }
+
+        publishFeedbackNotifier.notify(
+            .failed(
+                TranscriptPublishFeedbackFailure(publishID: activePublishFeedbackID)
+            )
+        )
+        self.activePublishFeedbackID = nil
     }
 
     private func teardownActiveSession() async {
@@ -755,7 +811,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
                 try await self.transcriptionClient.finalize()
             }
             group.addTask {
-                try await ContinuousSleepClock().sleep(for: self.finalizeRequestTimeout)
+                try await self.sleepClock.sleep(for: self.finalizeRequestTimeout)
                 throw NSError(
                     domain: "VoiceSessionCoordinator",
                     code: -1,
