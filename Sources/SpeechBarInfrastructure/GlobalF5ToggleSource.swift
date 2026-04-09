@@ -18,6 +18,7 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
 
     private let combination: RecordingHotkeyCombination
     private let registrar: GlobalHotKeyRegistering
+    private let hotKeyID: EventHotKeyID
     private let continuation: AsyncStream<HardwareEvent>.Continuation
     private var eventHistory: [HardwareEvent] = []
     private var registrationStatus: RecordingHotkeyRegistrationStatus = .invalidConfiguration
@@ -25,7 +26,7 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
     private var eventHandlerRef: EventHandlerRef?
     private var isRecordingActive = false
 
-    private static let hotKeyHandler: EventHandlerUPP = { _, _, userData in
+    private static let hotKeyHandler: EventHandlerUPP = { _, eventRef, userData in
         guard let userData else {
             return noErr
         }
@@ -33,7 +34,11 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         let source = Unmanaged<GlobalShortcutToggleSource>
             .fromOpaque(userData)
             .takeUnretainedValue()
-        source.handleHotKeyPress()
+        guard let eventRef else {
+            return noErr
+        }
+
+        source.handleHotKeyEvent(eventRef)
         return noErr
     }
 
@@ -47,6 +52,7 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         }
         self.combination = combination
         self.registrar = registrar
+        self.hotKeyID = EventHotKeyID(signature: 0x53505348, id: 1)
         self.continuation = capturedContinuation!
 
         guard combination.validationResult == .valid else {
@@ -54,7 +60,6 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
             return
         }
 
-        let hotKeyID = EventHotKeyID(signature: 0x53505348, id: 1)
         let installStatus = registrar.installHandler(
             Self.hotKeyHandler,
             userData: Unmanaged.passUnretained(self).toOpaque(),
@@ -107,6 +112,37 @@ public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked S
         )
         eventHistory.append(event)
         continuation.yield(event)
+    }
+
+    private func handleHotKeyEvent(_ eventRef: EventRef) {
+        guard let eventHotKeyID = Self.eventHotKeyID(from: eventRef) else {
+            return
+        }
+
+        guard eventHotKeyID.signature == hotKeyID.signature, eventHotKeyID.id == hotKeyID.id else {
+            return
+        }
+
+        handleHotKeyPress()
+    }
+
+    private static func eventHotKeyID(from eventRef: EventRef) -> EventHotKeyID? {
+        var eventHotKeyID = EventHotKeyID()
+        let status = GetEventParameter(
+            eventRef,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &eventHotKeyID
+        )
+
+        guard status == noErr else {
+            return nil
+        }
+
+        return eventHotKeyID
     }
 
     func registrationStatusForTesting() -> RecordingHotkeyRegistrationStatus {

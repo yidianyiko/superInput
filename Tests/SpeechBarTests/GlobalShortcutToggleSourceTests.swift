@@ -49,11 +49,28 @@ struct GlobalShortcutToggleSourceTests {
             registrar: registrar
         )
 
-        registrar.invokeInstalledHandler()
-        registrar.invokeInstalledHandler()
+        registrar.invokeInstalledHandler(with: EventHotKeyID(signature: 0x53505348, id: 1))
+        registrar.invokeInstalledHandler(with: EventHotKeyID(signature: 0x53505348, id: 1))
 
         let events = source.eventsForTesting(limit: 2)
         #expect(events.map(\.kind) == [.pushToTalkPressed, .pushToTalkReleased])
+    }
+
+    @Test
+    func ignoresHotkeyEventsWithDifferentIdentifiers() {
+        let registrar = MockGlobalHotKeyRegistrar(registerStatus: noErr)
+        let source = GlobalShortcutToggleSource(
+            combination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_R),
+                modifiers: UInt32(controlKey | optionKey | cmdKey)
+            ),
+            registrar: registrar
+        )
+
+        registrar.invokeInstalledHandler(with: EventHotKeyID(signature: 0x53505348, id: 99))
+
+        let events = source.eventsForTesting(limit: 1)
+        #expect(events.isEmpty)
     }
 }
 
@@ -68,6 +85,8 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
     private(set) var registeredModifiers: UInt32?
     private var installedHandler: EventHandlerUPP?
     private var installedUserData: UnsafeMutableRawPointer?
+    private let installedEventClass = OSType(kEventClassKeyboard)
+    private let installedEventKind = UInt32(kEventHotKeyPressed)
 
     init(installStatus: OSStatus = noErr, registerStatus: OSStatus) {
         self.installStatus = installStatus
@@ -100,7 +119,31 @@ final class MockGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
         removeHandlerCallCount += 1
     }
 
-    func invokeInstalledHandler() {
-        _ = installedHandler?(nil, nil, installedUserData)
+    func invokeInstalledHandler(with hotKeyID: EventHotKeyID) {
+        guard let installedHandler else { return }
+
+        var event: EventRef?
+        let createStatus = CreateEvent(
+            kCFAllocatorDefault,
+            installedEventClass,
+            installedEventKind,
+            0,
+            EventAttributes(kEventAttributeNone),
+            &event
+        )
+        guard createStatus == noErr, let event else { return }
+        defer { ReleaseEvent(event) }
+
+        var hotKeyID = hotKeyID
+        let setStatus = SetEventParameter(
+            event,
+            EventParamName(kEventParamDirectObject),
+            EventParamType(typeEventHotKeyID),
+            MemoryLayout<EventHotKeyID>.size,
+            &hotKeyID
+        )
+        guard setStatus == noErr else { return }
+
+        _ = installedHandler(nil, event, installedUserData)
     }
 }
