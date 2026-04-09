@@ -17,6 +17,7 @@ struct RepositoryPathCasingTests {
 
     @Test
     func trackedTextFilesDoNotReferenceUppercaseDocsPrefix() throws {
+        let forbiddenDocsPrefix = "Doc" + "s/"
         let offenders = try trackedRepositoryPaths()
             .filter { !$0.hasPrefix(".git/") }
             .filter { isLikelyTextFile(path: $0) }
@@ -26,10 +27,10 @@ struct RepositoryPathCasingTests {
                     return false
                 }
 
-                return contents.contains("Docs/")
+                return contents.contains(forbiddenDocsPrefix)
             }
 
-        #expect(offenders.isEmpty, "Found tracked files that reference 'Docs/': \(offenders)")
+        #expect(offenders.isEmpty, "Found tracked files that reference '\(forbiddenDocsPrefix)': \(offenders)")
     }
 }
 
