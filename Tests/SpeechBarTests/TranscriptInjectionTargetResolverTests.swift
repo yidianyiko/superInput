@@ -45,4 +45,19 @@ struct TranscriptInjectionTargetResolverTests {
 
         #expect(resolved == nil)
     }
+
+    @Test
+    func selectsIntersectingScreenAndClampsFallbackPointToInsetBounds() {
+        let screen = CGRect(x: 0, y: 0, width: 500, height: 400)
+        let window = CGRect(x: -200, y: -100, width: 300, height: 800)
+
+        let resolved = TranscriptInjectionTargetResolver.resolve(
+            elementFrame: nil,
+            windowFrame: window,
+            screenFrames: [screen]
+        )
+
+        #expect(resolved?.screenFrame == screen)
+        #expect(resolved?.destinationPoint == CGPoint(x: 56, y: 344))
+    }
 }

@@ -731,7 +731,11 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
             return nil
         }
 
-        let axValue = value as! AXValue
+        guard CFGetTypeID(value) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        let axValue = unsafeDowncast(value, to: AXValue.self)
         guard AXValueGetType(axValue) == .cgPoint else {
             return nil
         }
@@ -751,7 +755,11 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
             return nil
         }
 
-        let axValue = value as! AXValue
+        guard CFGetTypeID(value) == AXValueGetTypeID() else {
+            return nil
+        }
+
+        let axValue = unsafeDowncast(value, to: AXValue.self)
         guard AXValueGetType(axValue) == .cgSize else {
             return nil
         }
