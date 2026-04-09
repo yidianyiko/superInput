@@ -184,6 +184,104 @@ struct VoiceSessionCoordinatorTests {
 
     @Test
     @MainActor
+    func dismissSelectedStopsActiveSession() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pushToTalkPressed))
+
+        try await eventually {
+            coordinator.sessionState == .recording
+        }
+
+        hardware.send(HardwareEvent(source: .usbHID, kind: .dismissSelected))
+        client.emit(.utteranceEnded)
+
+        try await eventually {
+            if case .failed(let message) = coordinator.sessionState {
+                return message == "No speech was detected. Try again."
+            }
+            return false
+        }
+
+        #expect(client.finalizeCallCount == 1)
+    }
+
+    @Test
+    @MainActor
+    func switchBoardEventsTriggerWindowSwitching() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let windowSwitcher = MockWindowSwitcher()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            windowSwitcher: windowSwitcher,
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .usbHID, kind: .switchBoardNext))
+        hardware.send(HardwareEvent(source: .usbHID, kind: .switchBoardPrevious))
+
+        try await eventuallyAsync {
+            await windowSwitcher.snapshot() == [.next, .previous]
+        }
+    }
+
+    @Test
+    @MainActor
+    func boardPrimaryAndSecondaryPressesTriggerReturnKeyHandler() async throws {
+        let hardware = MockHardwareEventSource()
+        let audio = MockAudioInputSource()
+        let client = MockTranscriptionClient()
+        let credentials = MockCredentialProvider(storedAPIKey: "test-key")
+        let publisher = MockTranscriptPublisher()
+        let returnKeyCounter = MockReturnKeyPressCounter()
+
+        let coordinator = VoiceSessionCoordinator(
+            hardwareSource: hardware,
+            audioInputSource: audio,
+            transcriptionClient: client,
+            credentialProvider: credentials,
+            transcriptPublisher: publisher,
+            returnKeyHandler: {
+                returnKeyCounter.press()
+            },
+            sleepClock: ImmediateSleepClock()
+        )
+
+        coordinator.start()
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pressPrimary))
+        hardware.send(HardwareEvent(source: .usbHID, kind: .pressSecondary))
+
+        try await eventually {
+            returnKeyCounter.snapshot() == 2
+        }
+    }
+
+    @Test
+    @MainActor
     func enabledGlossaryTermsAreInjectedIntoConfigurationKeywords() async throws {
         let hardware = MockHardwareEventSource()
         let audio = MockAudioInputSource()

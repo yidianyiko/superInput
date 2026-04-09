@@ -15,6 +15,11 @@ public enum HardwareEventKind: String, Sendable, Equatable {
     case pushToTalkReleased
     case rotaryClockwise
     case rotaryCounterClockwise
+    case pressPrimary
+    case pressSecondary
+    case dismissSelected
+    case switchBoardNext
+    case switchBoardPrevious
 }
 
 public struct HardwareEvent: Sendable, Equatable {
@@ -37,6 +42,7 @@ public enum AppIntent: Sendable, Equatable {
     case startVoiceCapture(source: HardwareSourceKind)
     case stopVoiceCapture(source: HardwareSourceKind)
     case switchWindow(direction: WindowSwitchDirection, source: HardwareSourceKind)
+    case pressReturnKey(source: HardwareSourceKind)
 }
 
 public enum WindowSwitchDirection: String, Sendable, Equatable {

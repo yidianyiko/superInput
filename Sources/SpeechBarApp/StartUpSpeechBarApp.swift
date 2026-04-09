@@ -56,6 +56,8 @@ private struct AppDependencies {
     let pushToTalkSource: OnScreenPushToTalkSource
     let globalShortcutSource: GlobalRightCommandPushToTalkSource
     let rotaryTestSource: GlobalRotaryKeyTestSource
+    let boardEventSource: BoardEventFileHardwareEventSource
+    let boardInputBridgeController: BoardInputBridgeController
     let hardwareSource: MergedHardwareEventSource
     let userProfileStore: UserProfileStore
     let audioInputSettingsStore: AudioInputSettingsStore
@@ -79,10 +81,13 @@ private struct AppDependencies {
         let pushToTalkSource = OnScreenPushToTalkSource()
         let globalShortcutSource = GlobalRightCommandPushToTalkSource()
         let rotaryTestSource = GlobalRotaryKeyTestSource()
+        let boardEventSource = BoardEventFileHardwareEventSource()
+        let boardInputBridgeController = BoardInputBridgeController()
         let hardwareSource = MergedHardwareEventSource(sources: [
             pushToTalkSource,
             globalShortcutSource,
-            rotaryTestSource
+            rotaryTestSource,
+            boardEventSource
         ])
         let applicationTracker = FrontmostApplicationTracker()
         let windowSwitchOverlayStore = WindowSwitchOverlayStore()
@@ -225,6 +230,8 @@ private struct AppDependencies {
         self.pushToTalkSource = pushToTalkSource
         self.globalShortcutSource = globalShortcutSource
         self.rotaryTestSource = rotaryTestSource
+        self.boardEventSource = boardEventSource
+        self.boardInputBridgeController = boardInputBridgeController
         self.hardwareSource = hardwareSource
         self.userProfileStore = userProfileStore
         self.audioInputSettingsStore = audioInputSettingsStore
