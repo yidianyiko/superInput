@@ -31,6 +31,16 @@ struct RecordingHotkeyConfigurationTests {
     }
 
     @Test
+    func rejectsReservedRightCommandCombination() {
+        let reservedRightCommand = RecordingHotkeyCombination(
+            keyCode: UInt32(kVK_RightCommand),
+            modifiers: 0
+        )
+
+        #expect(reservedRightCommand.validationResult == .reservedRightCommand)
+    }
+
+    @Test
     func defaultCustomConfigurationUsesLegacyModifierCombo() {
         let configuration = RecordingHotkeyConfiguration.defaultCustom
 

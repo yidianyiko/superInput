@@ -23,11 +23,11 @@ public struct RecordingHotkeyCombination: Codable, Sendable, Equatable {
     }
 
     public var validationResult: RecordingHotkeyValidationResult {
-        guard modifiers != 0 else { return .missingModifier }
-        guard let keyCode else { return .missingMainKey }
-        if keyCode == UInt32(kVK_RightCommand), modifiers == UInt32(cmdKey) {
+        if keyCode == UInt32(kVK_RightCommand) {
             return .reservedRightCommand
         }
+        guard modifiers != 0 else { return .missingModifier }
+        guard keyCode != nil else { return .missingMainKey }
         return .valid
     }
 
