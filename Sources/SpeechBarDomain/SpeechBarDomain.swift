@@ -42,6 +42,7 @@ public enum AppIntent: Sendable, Equatable {
     case startVoiceCapture(source: HardwareSourceKind)
     case stopVoiceCapture(source: HardwareSourceKind)
     case switchWindow(direction: WindowSwitchDirection, source: HardwareSourceKind)
+    case pressReturnKey(source: HardwareSourceKind)
 }
 
 public enum WindowSwitchDirection: String, Sendable, Equatable {

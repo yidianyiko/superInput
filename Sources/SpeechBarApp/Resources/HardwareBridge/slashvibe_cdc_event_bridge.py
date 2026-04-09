@@ -124,6 +124,7 @@ def main() -> int:
     sequence = 1
     next_hello_at = 0.0
     read_buffer = bytearray()
+    ptt_toggle_on = False  # toggle: False=mic off, True=mic on
 
     with serial_port:
         while True:
@@ -161,6 +162,18 @@ def main() -> int:
                     continue
 
                 event_code = message.payload[0]
+
+                # KEY3 (code=8) and KEY1 press (code=6) toggle mic on/off
+                if event_code in (proto.INPUT_EVENT_PUSH_TO_TALK_PRESSED,
+                                  proto.INPUT_EVENT_SWITCH_BOARD_NEXT):
+                    ptt_toggle_on = not ptt_toggle_on
+                    toggle_kind = "pushToTalkPressed" if ptt_toggle_on else "pushToTalkReleased"
+                    append_event(output_path, toggle_kind, args.source)
+                    print(f"event kind={toggle_kind} seq={message.seq} (toggle={'on' if ptt_toggle_on else 'off'})")
+                    continue
+                if event_code == proto.INPUT_EVENT_PUSH_TO_TALK_RELEASED:
+                    continue
+
                 kind = EVENT_KIND_MAP.get(event_code)
                 if kind is None:
                     continue

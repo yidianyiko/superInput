@@ -1,4 +1,5 @@
 import Combine
+import CoreGraphics
 import Foundation
 import SpeechBarDomain
 
@@ -197,20 +198,33 @@ public final class VoiceSessionCoordinator: ObservableObject {
             await endVoiceCapture()
         case .switchWindow(let direction, _):
             await switchWindow(direction)
+        case .pressReturnKey:
+            pressReturnKey()
         }
     }
 
     private func mapAppIntent(from event: HardwareEvent) -> AppIntent {
         switch event.kind {
-        case .pushToTalkPressed, .pressPrimary:
+        case .pushToTalkPressed:
             return .startVoiceCapture(source: event.source)
-        case .pushToTalkReleased, .pressSecondary, .dismissSelected:
+        case .pushToTalkReleased, .dismissSelected:
             return .stopVoiceCapture(source: event.source)
+        case .pressPrimary, .pressSecondary:
+            return .pressReturnKey(source: event.source)
         case .rotaryClockwise, .switchBoardNext:
             return .switchWindow(direction: .next, source: event.source)
         case .rotaryCounterClockwise, .switchBoardPrevious:
             return .switchWindow(direction: .previous, source: event.source)
         }
+    }
+
+    private func pressReturnKey() {
+        guard let source = CGEventSource(stateID: .combinedSessionState) ?? CGEventSource(stateID: .hidSystemState) else { return }
+        let returnKeyCode: CGKeyCode = 36
+        let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true)
+        let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false)
+        keyDown?.post(tap: .cghidEventTap)
+        keyUp?.post(tap: .cghidEventTap)
     }
 
     private func switchWindow(_ direction: WindowSwitchDirection) async {

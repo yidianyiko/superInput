@@ -26,6 +26,7 @@ Docs/current-mac-speech-cloud-api-summary.md
 *.app/
 mac_handoff_*/
 slashvibe_v1_firmware-codex-slashvibe-bringup-autopilot/
+slashvibe_v1_firmware-codex-usb-ptt-mac-handoff/
 
 *.md
 
