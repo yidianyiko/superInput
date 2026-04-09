@@ -58,20 +58,49 @@ public enum TranscriptPublishFeedbackEvent: Sendable, Equatable {
     case failed(TranscriptPublishFeedbackFailure)
 }
 
-public final class TranscriptPublishFeedbackNotifier: Sendable {
-    public let events: AsyncStream<TranscriptPublishFeedbackEvent>
+public final class TranscriptPublishFeedbackNotifier: @unchecked Sendable {
+    public var events: AsyncStream<TranscriptPublishFeedbackEvent> {
+        let subscriberID = UUID()
 
-    private let continuation: AsyncStream<TranscriptPublishFeedbackEvent>.Continuation
-
-    public init() {
-        var capturedContinuation: AsyncStream<TranscriptPublishFeedbackEvent>.Continuation?
-        self.events = AsyncStream { continuation in
-            capturedContinuation = continuation
+        return AsyncStream(bufferingPolicy: .bufferingNewest(8)) { continuation in
+            storeContinuation(continuation, for: subscriberID)
+            continuation.onTermination = { [weak self] _ in
+                self?.removeContinuation(for: subscriberID)
+            }
         }
-        self.continuation = capturedContinuation!
     }
 
+    private let lock = NSLock()
+    private var continuations: [UUID: AsyncStream<TranscriptPublishFeedbackEvent>.Continuation] = [:]
+
+    public init() {}
+
     public func notify(_ event: TranscriptPublishFeedbackEvent) {
-        continuation.yield(event)
+        let continuations = activeContinuations()
+        for continuation in continuations {
+            continuation.yield(event)
+        }
+    }
+
+    private func storeContinuation(
+        _ continuation: AsyncStream<TranscriptPublishFeedbackEvent>.Continuation,
+        for subscriberID: UUID
+    ) {
+        lock.lock()
+        continuations[subscriberID] = continuation
+        lock.unlock()
+    }
+
+    private func removeContinuation(for subscriberID: UUID) {
+        lock.lock()
+        continuations.removeValue(forKey: subscriberID)
+        lock.unlock()
+    }
+
+    private func activeContinuations() -> [AsyncStream<TranscriptPublishFeedbackEvent>.Continuation] {
+        lock.lock()
+        let active = Array(continuations.values)
+        lock.unlock()
+        return active
     }
 }

@@ -70,7 +70,7 @@ struct VoiceSessionCoordinatorTests {
         )
 
         let eventTask = Task {
-            await collectPublishFeedbackEvents(
+            try await collectPublishFeedbackEvents(
                 from: coordinator.publishFeedbackNotifier.events,
                 count: 2
             )
@@ -95,7 +95,7 @@ struct VoiceSessionCoordinatorTests {
             coordinator.sessionState == .idle
         }
 
-        let events = await eventTask.value
+        let events = try await eventTask.value
         #expect(events.count == 2)
 
         guard case .started(let started) = events[0] else {
@@ -133,7 +133,7 @@ struct VoiceSessionCoordinatorTests {
         )
 
         let eventTask = Task {
-            await collectPublishFeedbackEvents(
+            try await collectPublishFeedbackEvents(
                 from: coordinator.publishFeedbackNotifier.events,
                 count: 2
             )
@@ -157,7 +157,7 @@ struct VoiceSessionCoordinatorTests {
             coordinator.sessionState == .idle
         }
 
-        let events = await eventTask.value
+        let events = try await eventTask.value
         #expect(events.count == 2)
 
         guard case .started(let started) = events[0] else {
@@ -171,6 +171,40 @@ struct VoiceSessionCoordinatorTests {
         }
 
         #expect(started.publishID == failed.publishID)
+    }
+
+    @Test
+    func publishFeedbackNotifierBroadcastsToIndependentSubscribers() async throws {
+        let notifier = TranscriptPublishFeedbackNotifier()
+        let publishID = UUID()
+        let event = TranscriptPublishFeedbackEvent.started(
+            TranscriptPublishFeedbackStart(
+                publishID: publishID,
+                transcript: PublishedTranscript(text: "ni hao")
+            )
+        )
+
+        let firstSubscriber = Task {
+            try await collectPublishFeedbackEvents(
+                from: notifier.events,
+                count: 1
+            )
+        }
+        let secondSubscriber = Task {
+            try await collectPublishFeedbackEvents(
+                from: notifier.events,
+                count: 1
+            )
+        }
+
+        try await Task.sleep(for: .milliseconds(20))
+        notifier.notify(event)
+
+        let firstEvents = try await firstSubscriber.value
+        let secondEvents = try await secondSubscriber.value
+
+        #expect(firstEvents == [event])
+        #expect(secondEvents == [event])
     }
 
     @Test
@@ -1052,13 +1086,26 @@ private func eventuallyAsync(
 private func collectPublishFeedbackEvents(
     from stream: AsyncStream<TranscriptPublishFeedbackEvent>,
     count: Int
-) async -> [TranscriptPublishFeedbackEvent] {
-    var iterator = stream.makeAsyncIterator()
-    var events: [TranscriptPublishFeedbackEvent] = []
+) async throws -> [TranscriptPublishFeedbackEvent] {
+    try await withThrowingTaskGroup(of: [TranscriptPublishFeedbackEvent].self) { group in
+        group.addTask {
+            var iterator = stream.makeAsyncIterator()
+            var events: [TranscriptPublishFeedbackEvent] = []
 
-    while events.count < count, let event = await iterator.next() {
-        events.append(event)
+            while events.count < count, let event = await iterator.next() {
+                events.append(event)
+            }
+
+            return events
+        }
+
+        group.addTask {
+            try await Task.sleep(for: .seconds(1))
+            throw TestFailure.timeout
+        }
+
+        let result = try await group.next() ?? []
+        group.cancelAll()
+        return result
     }
-
-    return events
 }
