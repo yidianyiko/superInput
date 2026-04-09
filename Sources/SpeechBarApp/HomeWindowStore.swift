@@ -327,6 +327,20 @@ final class HomeWindowStore: ObservableObject {
         let isToday: Bool
     }
 
+    struct UsageStatistics: Codable, Equatable {
+        var totalSessionCount: Int
+        var totalCharacterCount: Int
+        var totalDurationSeconds: TimeInterval
+        var dailySessionCounts: [String: Int]
+
+        static let empty = UsageStatistics(
+            totalSessionCount: 0,
+            totalCharacterCount: 0,
+            totalDurationSeconds: 0,
+            dailySessionCounts: [:]
+        )
+    }
+
     @Published var selectedSection: Section
     @Published var memoryProfile: String
     @Published var selectedTheme: ThemePreset
@@ -334,6 +348,7 @@ final class HomeWindowStore: ObservableObject {
     @Published var subscriptionPurchaseURL: String
     @Published var subscriptionManageURL: String
     @Published var apiKeyInput = ""
+    @Published private(set) var statistics: UsageStatistics
     @Published private(set) var history: [TranscriptHistoryItem]
 
     let coordinator: VoiceSessionCoordinator
@@ -363,7 +378,9 @@ final class HomeWindowStore: ObservableObject {
             from: defaults,
             fallback: "https://your-domain.com/account/billing"
         )
-        self.history = Self.loadHistory(from: defaults)
+        let loadedHistory = Self.loadHistory(from: defaults)
+        self.history = loadedHistory
+        self.statistics = Self.loadStatistics(from: defaults, fallbackHistory: loadedHistory)
         bindPersistence()
         bindCoordinator()
     }
@@ -373,19 +390,19 @@ final class HomeWindowStore: ObservableObject {
     }
 
     var totalSessionCount: Int {
-        history.count
+        statistics.totalSessionCount
     }
 
     var todaySessionCount: Int {
-        history.filter { Calendar.current.isDateInToday($0.createdAt) }.count
+        statistics.dailySessionCounts[Self.dayKey(for: Date())] ?? 0
     }
 
     var totalCharacterCount: Int {
-        history.reduce(0) { $0 + $1.characterCount }
+        statistics.totalCharacterCount
     }
 
     var totalDurationSeconds: TimeInterval {
-        history.reduce(0) { $0 + $1.durationSeconds }
+        statistics.totalDurationSeconds
     }
 
     var totalDictationMinutes: Int {
@@ -394,8 +411,8 @@ final class HomeWindowStore: ObservableObject {
     }
 
     var averageCharacterCount: Int {
-        guard !history.isEmpty else { return 0 }
-        return Int(Double(totalCharacterCount) / Double(history.count))
+        guard totalSessionCount > 0 else { return 0 }
+        return Int(Double(totalCharacterCount) / Double(totalSessionCount))
     }
 
     var averageDictationCharactersPerMinute: Int {
@@ -417,7 +434,7 @@ final class HomeWindowStore: ObservableObject {
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else {
                 return nil
             }
-            let count = history.filter { calendar.isDate($0.createdAt, inSameDayAs: day) }.count
+            let count = statistics.dailySessionCounts[Self.dayKey(for: day)] ?? 0
             let label = Self.weekdayFormatter.string(from: day)
             return DailyUsagePoint(
                 label: label,
@@ -470,7 +487,9 @@ final class HomeWindowStore: ObservableObject {
 
     func clearHistory() {
         history = []
+        statistics = .empty
         saveHistory()
+        saveStatistics()
     }
 
     func saveSelectedSection(_ section: Section) {
@@ -570,12 +589,27 @@ final class HomeWindowStore: ObservableObject {
         if history.count > 120 {
             history = Array(history.prefix(120))
         }
+        recordStatistics(for: item)
         saveHistory()
+        saveStatistics()
+    }
+
+    private func recordStatistics(for item: TranscriptHistoryItem) {
+        statistics.totalSessionCount += 1
+        statistics.totalCharacterCount += item.characterCount
+        statistics.totalDurationSeconds += item.durationSeconds
+        statistics.dailySessionCounts[Self.dayKey(for: item.createdAt), default: 0] += 1
     }
 
     private func saveHistory() {
         if let data = try? JSONEncoder().encode(history) {
             defaults.set(data, forKey: Keys.history)
+        }
+    }
+
+    private func saveStatistics() {
+        if let data = try? JSONEncoder().encode(statistics) {
+            defaults.set(data, forKey: Keys.statistics)
         }
     }
 
@@ -648,8 +682,37 @@ final class HomeWindowStore: ObservableObject {
         return items
     }
 
+    private static func loadStatistics(from defaults: UserDefaults, fallbackHistory: [TranscriptHistoryItem]) -> UsageStatistics {
+        guard
+            let data = defaults.data(forKey: Keys.statistics),
+            let statistics = try? JSONDecoder().decode(UsageStatistics.self, from: data)
+        else {
+            return deriveStatistics(from: fallbackHistory)
+        }
+        return statistics
+    }
+
+    private static func deriveStatistics(from history: [TranscriptHistoryItem]) -> UsageStatistics {
+        history.reduce(into: .empty) { statistics, item in
+            statistics.totalSessionCount += 1
+            statistics.totalCharacterCount += item.characterCount
+            statistics.totalDurationSeconds += item.durationSeconds
+            statistics.dailySessionCounts[dayKey(for: item.createdAt), default: 0] += 1
+        }
+    }
+
     private static func historySignature(for text: String, createdAt: Date) -> String {
         "\(text)|\(createdAt.timeIntervalSince1970)"
+    }
+
+    private static func dayKey(for date: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(
+            format: "%04d-%02d-%02d",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0
+        )
     }
 
     private static func deliveryLabel(for outcome: TranscriptDeliveryOutcome?) -> String {
@@ -674,6 +737,7 @@ final class HomeWindowStore: ObservableObject {
         static let themeStyleVersion = "home.themeStyleVersion"
         static let modelConfiguration = "home.modelConfiguration"
         static let history = "home.history"
+        static let statistics = "home.statistics"
         static let subscriptionPurchaseURL = "home.subscriptionPurchaseURL"
         static let subscriptionManageURL = "home.subscriptionManageURL"
     }

@@ -151,6 +151,10 @@ actor MockTranscriptPublisher: TranscriptPublisher {
         return outcome
     }
 
+    func setOutcome(_ outcome: TranscriptDeliveryOutcome) {
+        self.outcome = outcome
+    }
+
     func snapshot() -> [PublishedTranscript] {
         published
     }

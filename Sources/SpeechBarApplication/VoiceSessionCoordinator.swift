@@ -276,7 +276,6 @@ public final class VoiceSessionCoordinator: ObservableObject {
         statusMessage = "Preparing microphone..."
         isPushToTalkActive = true
         sessionState = .requestingPermission
-        activeSessionStartedAt = Date()
         overlayPhase = .recording
         overlaySubtitle = "Listening"
         audioLevelWindow = []
@@ -348,6 +347,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
             }
         }
 
+        activeSessionStartedAt = Date()
         sessionState = .recording
         statusMessage = "Listening..."
         overlayPhase = .recording
@@ -498,8 +498,9 @@ public final class VoiceSessionCoordinator: ObservableObject {
 
         let completedAt = Date()
         let publishedTranscript = PublishedTranscript(text: polishedTranscript, createdAt: completedAt)
-        let completedDuration = activeSessionStartedAt.map {
-            max(0, completedAt.timeIntervalSince($0))
+        let completedDuration = activeSessionStartedAt.map { startedAt in
+            let endedAt = activeFinalizeStartedAt ?? completedAt
+            return max(0, endedAt.timeIntervalSince(startedAt))
         }
         let deliveryOutcome: TranscriptDeliveryOutcome
         do {
@@ -521,9 +522,9 @@ public final class VoiceSessionCoordinator: ObservableObject {
             return
         }
 
-        lastCompletedTranscript = publishedTranscript
         lastDeliveryOutcome = deliveryOutcome
         lastCompletedSessionDuration = completedDuration
+        lastCompletedTranscript = publishedTranscript
         if let activeFinalizeStartedAt {
             performanceLog(
                 "session finished, endToEndFinalizeLatency=\(String(format: "%.3f", Date().timeIntervalSince(activeFinalizeStartedAt)))s"
