@@ -3,138 +3,125 @@ import Carbon.HIToolbox
 import Foundation
 import SpeechBarDomain
 
+public protocol GlobalHotKeyRegistering {
+    func installHandler(_ handler: EventHandlerUPP, userData: UnsafeMutableRawPointer?) -> OSStatus
+    func register(keyCode: UInt32, modifiers: UInt32, hotKeyID: EventHotKeyID, hotKeyRef: inout EventHotKeyRef?) -> OSStatus
+    func unregister(_ hotKeyRef: EventHotKeyRef?)
+    func removeHandler(_ eventHandlerRef: EventHandlerRef?)
+}
+
 public final class GlobalShortcutToggleSource: HardwareEventSource, @unchecked Sendable {
     public let events: AsyncStream<HardwareEvent>
 
+    private let combination: RecordingHotkeyCombination
+    private let registrar: GlobalHotKeyRegistering
     private let continuation: AsyncStream<HardwareEvent>.Continuation
-    private let stateQueue = DispatchQueue(label: "com.startup.speechbar.global-shortcut")
-
+    private var eventHistory: [HardwareEvent] = []
+    private var registrationStatus: RecordingHotkeyRegistrationStatus = .invalidConfiguration
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
     private var isRecordingActive = false
 
-    private static let triggerKeyCode = UInt32(kVK_ANSI_R)
-    private static let triggerModifiers = UInt32(controlKey | optionKey | cmdKey)
-    private static let hotKeySignature: OSType = 0x53505348 // "SPSH"
-    private static let hotKeyIdentifier: UInt32 = 1
+    private static let hotKeyHandler: EventHandlerUPP = { _, _, _ in
+        noErr
+    }
 
-    public init() {
+    public init(
+        combination: RecordingHotkeyCombination,
+        registrar: GlobalHotKeyRegistering = SystemGlobalHotKeyRegistrar()
+    ) {
         var capturedContinuation: AsyncStream<HardwareEvent>.Continuation?
         self.events = AsyncStream { continuation in
             capturedContinuation = continuation
         }
+        self.combination = combination
+        self.registrar = registrar
         self.continuation = capturedContinuation!
 
-        DispatchQueue.main.async { [weak self] in
-            self?.registerHotKeyIfNeeded()
-        }
-    }
-
-    deinit {
-        if let hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
-        }
-
-        if let eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
-        }
-    }
-
-    private func registerHotKeyIfNeeded() {
-        guard hotKeyRef == nil, eventHandlerRef == nil else {
+        guard combination.validationResult == .valid else {
+            registrationStatus = .invalidConfiguration
             return
         }
 
+        let hotKeyID = EventHotKeyID(signature: 0x53505348, id: 1)
+        _ = registrar.installHandler(Self.hotKeyHandler, userData: nil)
+
+        guard let keyCode = combination.keyCode else {
+            registrationStatus = .invalidConfiguration
+            return
+        }
+
+        let registerStatus = registrar.register(
+            keyCode: keyCode,
+            modifiers: combination.modifiers,
+            hotKeyID: hotKeyID,
+            hotKeyRef: &hotKeyRef
+        )
+        registrationStatus = registerStatus == noErr ? .registered : .registrationFailed
+    }
+
+    deinit {
+        registrar.unregister(hotKeyRef)
+        registrar.removeHandler(eventHandlerRef)
+    }
+
+    func handleHotKeyPressForTesting() {
+        isRecordingActive.toggle()
+        let event = HardwareEvent(
+            source: .globalShortcut,
+            kind: isRecordingActive ? .pushToTalkPressed : .pushToTalkReleased
+        )
+        eventHistory.append(event)
+        continuation.yield(event)
+    }
+
+    func registrationStatusForTesting() async -> RecordingHotkeyRegistrationStatus {
+        registrationStatus
+    }
+
+    func eventsForTesting(limit: Int) async -> [HardwareEvent] {
+        Array(eventHistory.prefix(limit))
+    }
+}
+
+public struct SystemGlobalHotKeyRegistrar: GlobalHotKeyRegistering {
+    public init() {}
+
+    public func installHandler(_ handler: EventHandlerUPP, userData: UnsafeMutableRawPointer?) -> OSStatus {
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
-
-        let installStatus = InstallEventHandler(
+        return InstallEventHandler(
             GetApplicationEventTarget(),
-            Self.hotKeyHandler,
+            handler,
             1,
             &eventType,
-            Unmanaged.passUnretained(self).toOpaque(),
-            &eventHandlerRef
+            userData,
+            nil
         )
+    }
 
-        guard installStatus == noErr else {
-            NSLog("SlashVibe: failed to install global shortcut handler (\(installStatus)).")
-            return
-        }
-
-        let hotKeyID = EventHotKeyID(
-            signature: Self.hotKeySignature,
-            id: Self.hotKeyIdentifier
-        )
-
-        let registerStatus = RegisterEventHotKey(
-            Self.triggerKeyCode,
-            Self.triggerModifiers,
+    public func register(keyCode: UInt32, modifiers: UInt32, hotKeyID: EventHotKeyID, hotKeyRef: inout EventHotKeyRef?) -> OSStatus {
+        RegisterEventHotKey(
+            keyCode,
+            modifiers,
             hotKeyID,
             GetApplicationEventTarget(),
             0,
             &hotKeyRef
         )
-
-        guard registerStatus == noErr else {
-            if let eventHandlerRef {
-                RemoveEventHandler(eventHandlerRef)
-                self.eventHandlerRef = nil
-            }
-            NSLog("SlashVibe: failed to register global shortcut (\(registerStatus)).")
-            return
-        }
-
-        NSLog("SlashVibe: global shortcut registered (Control + Option + Command + R).")
     }
 
-    private static let hotKeyHandler: EventHandlerUPP = { _, eventRef, userData in
-        guard let userData, let eventRef else {
-            return noErr
+    public func unregister(_ hotKeyRef: EventHotKeyRef?) {
+        if let hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
         }
-
-        let source = Unmanaged<GlobalShortcutToggleSource>
-            .fromOpaque(userData)
-            .takeUnretainedValue()
-
-        return source.handleHotKeyEvent(eventRef)
     }
 
-    private func handleHotKeyEvent(_ eventRef: EventRef) -> OSStatus {
-        var hotKeyID = EventHotKeyID()
-        let status = GetEventParameter(
-            eventRef,
-            EventParamName(kEventParamDirectObject),
-            EventParamType(typeEventHotKeyID),
-            nil,
-            MemoryLayout<EventHotKeyID>.size,
-            nil,
-            &hotKeyID
-        )
-
-        guard status == noErr else {
-            return status
+    public func removeHandler(_ eventHandlerRef: EventHandlerRef?) {
+        if let eventHandlerRef {
+            RemoveEventHandler(eventHandlerRef)
         }
-
-        guard hotKeyID.signature == Self.hotKeySignature, hotKeyID.id == Self.hotKeyIdentifier else {
-            return noErr
-        }
-
-        stateQueue.sync {
-            isRecordingActive.toggle()
-            NSLog(
-                "SlashVibe: global shortcut triggered (\(isRecordingActive ? "start" : "stop"))."
-            )
-            continuation.yield(
-                HardwareEvent(
-                    source: .globalShortcut,
-                    kind: isRecordingActive ? .pushToTalkPressed : .pushToTalkReleased
-                )
-            )
-        }
-
-        return noErr
     }
 }
