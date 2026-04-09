@@ -165,6 +165,44 @@ enum RecordingHotkeyDisplayFormatter {
         UInt32(kVK_ANSI_9): "9"
     ]
 
+    private static let specialKeyDisplayStrings: [UInt32: String] = [
+        UInt32(kVK_Return): "↩",
+        UInt32(kVK_Tab): "Tab",
+        UInt32(kVK_Space): "Space",
+        UInt32(kVK_Delete): "⌫",
+        UInt32(kVK_ForwardDelete): "⌦",
+        UInt32(kVK_Escape): "Esc",
+        UInt32(kVK_LeftArrow): "←",
+        UInt32(kVK_RightArrow): "→",
+        UInt32(kVK_UpArrow): "↑",
+        UInt32(kVK_DownArrow): "↓",
+        UInt32(kVK_Home): "Home",
+        UInt32(kVK_End): "End",
+        UInt32(kVK_PageUp): "PgUp",
+        UInt32(kVK_PageDown): "PgDn",
+        UInt32(kVK_Help): "Help",
+        UInt32(kVK_F1): "F1",
+        UInt32(kVK_F2): "F2",
+        UInt32(kVK_F3): "F3",
+        UInt32(kVK_F4): "F4",
+        UInt32(kVK_F5): "F5",
+        UInt32(kVK_F6): "F6",
+        UInt32(kVK_F7): "F7",
+        UInt32(kVK_F8): "F8",
+        UInt32(kVK_F9): "F9",
+        UInt32(kVK_F10): "F10",
+        UInt32(kVK_F11): "F11",
+        UInt32(kVK_F12): "F12",
+        UInt32(kVK_F13): "F13",
+        UInt32(kVK_F14): "F14",
+        UInt32(kVK_F15): "F15",
+        UInt32(kVK_F16): "F16",
+        UInt32(kVK_F17): "F17",
+        UInt32(kVK_F18): "F18",
+        UInt32(kVK_F19): "F19",
+        UInt32(kVK_F20): "F20"
+    ]
+
     static func modifierString(for modifiers: UInt32) -> String {
         var pieces: [String] = []
         if modifiers & UInt32(controlKey) != 0 { pieces.append("⌃") }
@@ -175,15 +213,12 @@ enum RecordingHotkeyDisplayFormatter {
     }
 
     static func keyString(for keyCode: UInt32) -> String? {
-        switch keyCode {
-        case UInt32(kVK_ANSI_R):
-            return "R"
-        case UInt32(kVK_Return):
-            return "↩"
-        case UInt32(kVK_Space):
-            return "Space"
-        default:
-            return ansiDisplayStrings[keyCode]
+        if let specialKeyDisplay = specialKeyDisplayStrings[keyCode] {
+            return specialKeyDisplay
         }
+        if let ansiDisplay = ansiDisplayStrings[keyCode] {
+            return ansiDisplay
+        }
+        return "Key\(keyCode)"
     }
 }

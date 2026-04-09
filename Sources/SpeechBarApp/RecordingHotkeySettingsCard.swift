@@ -30,7 +30,12 @@ struct RecordingHotkeySettingsCard: View {
         }
 
         if store.configuration.customCombination.validationResult == .valid {
-            return "当前组合有效，切换到“自定义组合”后会立即生效。"
+            if store.configuration.mode == .customCombo {
+                return store.diagnostics.registrationStatus == .registered
+                    ? "当前组合已注册并正在监听。"
+                    : "当前组合已保存；是否可用以下方监听状态为准。"
+            }
+            return "当前组合有效，切换到“自定义组合”后会立即尝试生效。"
         }
 
         return store.validationMessage(for: store.configuration.customCombination)
@@ -344,15 +349,20 @@ private struct RecordingHotkeyCaptureView: NSViewRepresentable {
     }
 }
 
-private final class RecordingHotkeyCaptureNSView: NSView {
+final class RecordingHotkeyCaptureNSView: NSView {
     var onPreview: ((RecordingHotkeyCombination?) -> Void)?
     var onCommit: ((RecordingHotkeyCombination) -> Void)?
     var onCancel: (() -> Void)?
+    private weak var previousFirstResponder: NSResponder?
 
     var isActive = false {
         didSet {
-            guard isActive else { return }
-            focusIfNeeded()
+            guard oldValue != isActive else { return }
+            if isActive {
+                focusIfNeeded()
+            } else {
+                restoreFocusIfNeeded()
+            }
         }
     }
 
@@ -400,8 +410,33 @@ private final class RecordingHotkeyCaptureNSView: NSView {
 
     private func focusIfNeeded() {
         guard isActive, let window else { return }
-        DispatchQueue.main.async {
+        if window.firstResponder !== self {
+            previousFirstResponder = window.firstResponder
+        }
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, self.isActive else { return }
+            if window.firstResponder !== self {
+                self.previousFirstResponder = window.firstResponder
+            }
             window.makeFirstResponder(self)
+        }
+    }
+
+    private func restoreFocusIfNeeded() {
+        guard let window else {
+            previousFirstResponder = nil
+            return
+        }
+        let responderToRestore = previousFirstResponder
+        previousFirstResponder = nil
+        DispatchQueue.main.async { [weak self, weak window] in
+            guard let self, let window, !self.isActive else { return }
+            guard window.firstResponder === self else { return }
+            if let responderToRestore, responderToRestore !== self {
+                window.makeFirstResponder(responderToRestore)
+            } else {
+                window.makeFirstResponder(nil)
+            }
         }
     }
 

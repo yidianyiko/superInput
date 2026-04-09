@@ -38,6 +38,31 @@ struct RecordingHotkeyConfigurationTests {
     }
 
     @Test
+    func formatsCommonNonAnsiKeysForDisplay() {
+        let tabCombination = RecordingHotkeyCombination(
+            keyCode: UInt32(kVK_Tab),
+            modifiers: UInt32(controlKey)
+        )
+        let functionKeyCombination = RecordingHotkeyCombination(
+            keyCode: UInt32(kVK_F5),
+            modifiers: UInt32(optionKey)
+        )
+
+        #expect(tabCombination.displayString == "⌃Tab")
+        #expect(functionKeyCombination.displayString == "⌥F5")
+    }
+
+    @Test
+    func fallsBackToNumericKeyDisplayForUnknownKeys() {
+        let combination = RecordingHotkeyCombination(
+            keyCode: 255,
+            modifiers: UInt32(cmdKey)
+        )
+
+        #expect(combination.displayString == "⌘Key255")
+    }
+
+    @Test
     func rejectsBareKeysAndModifierOnlyCombinations() {
         let bareKey = RecordingHotkeyCombination(
             keyCode: UInt32(kVK_ANSI_R),
