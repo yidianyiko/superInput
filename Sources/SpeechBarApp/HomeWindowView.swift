@@ -13,7 +13,7 @@ struct HomeWindowView: View {
     @ObservedObject var store: HomeWindowStore
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var audioInputSettingsStore: AudioInputSettingsStore
-    @ObservedObject var recordingHotkeySettingsStore: RecordingHotkeySettingsStore
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     @ObservedObject var modelSettingsStore: OpenAIModelSettingsStore
     @ObservedObject var polishPlaygroundStore: PolishPlaygroundStore
     @ObservedObject var localWhisperModelStore: LocalWhisperModelStore

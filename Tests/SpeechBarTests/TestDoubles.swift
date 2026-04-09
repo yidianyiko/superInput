@@ -93,13 +93,9 @@ final class MockRecordingHotkeySettingsController: RecordingHotkeySettingsContro
 
     func apply(_ configuration: RecordingHotkeyConfiguration) {
         appliedConfigurations.append(configuration)
-        diagnosticsSnapshot = RecordingHotkeyDiagnosticsSnapshot(
-            configuration: configuration,
-            registrationStatus: diagnosticsSnapshot.registrationStatus,
-            requiresAccessibility: diagnosticsSnapshot.requiresAccessibility,
-            accessibilityTrusted: diagnosticsSnapshot.accessibilityTrusted,
-            lastTrigger: diagnosticsSnapshot.lastTrigger,
-            guidanceText: diagnosticsSnapshot.guidanceText
+        diagnosticsSnapshot = Self.recomputedDiagnostics(
+            previous: diagnosticsSnapshot,
+            configuration: configuration
         )
         diagnosticsContinuation.yield(diagnosticsSnapshot)
     }
@@ -107,6 +103,45 @@ final class MockRecordingHotkeySettingsController: RecordingHotkeySettingsContro
     func emitDiagnostics(_ diagnosticsSnapshot: RecordingHotkeyDiagnosticsSnapshot) {
         self.diagnosticsSnapshot = diagnosticsSnapshot
         diagnosticsContinuation.yield(diagnosticsSnapshot)
+    }
+
+    private static func recomputedDiagnostics(
+        previous: RecordingHotkeyDiagnosticsSnapshot,
+        configuration: RecordingHotkeyConfiguration
+    ) -> RecordingHotkeyDiagnosticsSnapshot {
+        let requiresAccessibility = configuration.mode == .rightCommand
+        let accessibilityTrusted = requiresAccessibility ? previous.accessibilityTrusted : true
+
+        let registrationStatus: RecordingHotkeyRegistrationStatus
+        let guidanceText: String?
+
+        switch configuration.mode {
+        case .rightCommand:
+            if accessibilityTrusted {
+                registrationStatus = .registered
+                guidanceText = nil
+            } else {
+                registrationStatus = .permissionRequired
+                guidanceText = "Grant Accessibility access to use the right Command hotkey."
+            }
+        case .customCombo:
+            if configuration.customCombination.validationResult == .valid {
+                registrationStatus = .registered
+                guidanceText = nil
+            } else {
+                registrationStatus = .invalidConfiguration
+                guidanceText = "Choose a valid custom hotkey combination."
+            }
+        }
+
+        return RecordingHotkeyDiagnosticsSnapshot(
+            configuration: configuration,
+            registrationStatus: registrationStatus,
+            requiresAccessibility: requiresAccessibility,
+            accessibilityTrusted: accessibilityTrusted,
+            lastTrigger: previous.lastTrigger,
+            guidanceText: guidanceText
+        )
     }
 }
 

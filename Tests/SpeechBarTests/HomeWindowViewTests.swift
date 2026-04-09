@@ -89,6 +89,43 @@ struct HomeWindowViewTests {
 
     @Test
     @MainActor
+    func recordingHotkeySettingsUpdatesDoNotInvalidateRootViewBeforeConsumption() async throws {
+        let dependencies = makeHomeWindowDependencies()
+        dependencies.store.saveSelectedSection(.home)
+        var bodyEvaluationCount = 0
+
+        let view = HomeWindowView(
+            coordinator: dependencies.coordinator,
+            agentMonitorCoordinator: dependencies.agentMonitorCoordinator,
+            embeddedDisplayCoordinator: dependencies.embeddedDisplayCoordinator,
+            diagnosticsCoordinator: dependencies.diagnosticsCoordinator,
+            store: dependencies.store,
+            userProfileStore: dependencies.userProfileStore,
+            audioInputSettingsStore: dependencies.audioInputSettingsStore,
+            recordingHotkeySettingsStore: dependencies.recordingHotkeySettingsStore,
+            modelSettingsStore: dependencies.modelSettingsStore,
+            polishPlaygroundStore: dependencies.polishPlaygroundStore,
+            localWhisperModelStore: dependencies.localWhisperModelStore,
+            senseVoiceModelStore: dependencies.senseVoiceModelStore,
+            memoryConstellationStore: dependencies.memoryConstellationStore,
+            memoryFeatureFlagStore: dependencies.memoryFeatureFlagStore,
+            pushToTalkSource: dependencies.pushToTalkSource,
+            bodyEvaluationProbe: { bodyEvaluationCount += 1 }
+        )
+        let hostingView = NSHostingView(rootView: view.frame(width: 1240, height: 780))
+
+        hostingView.layoutSubtreeIfNeeded()
+        let baselineCount = bodyEvaluationCount
+
+        dependencies.recordingHotkeySettingsStore.setMode(.customCombo)
+        try await Task.sleep(for: .milliseconds(80))
+        hostingView.layoutSubtreeIfNeeded()
+
+        #expect(bodyEvaluationCount == baselineCount)
+    }
+
+    @Test
+    @MainActor
     func greenDefaultThemeRendersDarkHomeSurface() {
         let dependencies = makeHomeWindowDependencies()
         dependencies.store.saveSelectedSection(.home)

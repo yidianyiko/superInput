@@ -10,7 +10,7 @@ struct StatusPanelView: View {
     @ObservedObject var diagnosticsCoordinator: DiagnosticsCoordinator
     @ObservedObject var userProfileStore: UserProfileStore
     @ObservedObject var audioInputSettingsStore: AudioInputSettingsStore
-    @ObservedObject var recordingHotkeySettingsStore: RecordingHotkeySettingsStore
+    let recordingHotkeySettingsStore: RecordingHotkeySettingsStore
     @ObservedObject var modelSettingsStore: OpenAIModelSettingsStore
     @ObservedObject var localWhisperModelStore: LocalWhisperModelStore
     @ObservedObject var senseVoiceModelStore: SenseVoiceModelStore

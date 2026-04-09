@@ -95,6 +95,44 @@ struct RecordingHotkeySettingsStoreTests {
 
     @Test
     @MainActor
+    func initAppliesPersistedConfigurationWhenControllerSnapshotMismatches() throws {
+        let defaults = makeRecordingHotkeySettingsDefaults()
+        defer { clearRecordingHotkeySettingsDefaults(defaults) }
+
+        let persistedConfiguration = RecordingHotkeyConfiguration(
+            mode: .customCombo,
+            customCombination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_J),
+                modifiers: UInt32(controlKey | optionKey)
+            )
+        )
+        defaults.set(
+            try JSONEncoder().encode(persistedConfiguration),
+            forKey: RecordingHotkeySettingsStore.defaultsKey
+        )
+
+        let controller = MockRecordingHotkeySettingsController(
+            diagnosticsSnapshot: makeDiagnostics(
+                configuration: .defaultRightCommand,
+                registrationStatus: .permissionRequired,
+                requiresAccessibility: true,
+                accessibilityTrusted: false,
+                guidanceText: "Grant Accessibility access to use the right Command hotkey."
+            )
+        )
+
+        let store = RecordingHotkeySettingsStore(defaults: defaults, controller: controller)
+
+        #expect(controller.appliedConfigurations == [persistedConfiguration])
+        #expect(store.configuration == persistedConfiguration)
+        #expect(store.diagnostics.configuration == persistedConfiguration)
+        #expect(store.diagnostics.requiresAccessibility == false)
+        #expect(store.diagnostics.accessibilityTrusted == true)
+        #expect(store.diagnostics.guidanceText == nil)
+    }
+
+    @Test
+    @MainActor
     func diagnosticsUpdatesRefreshObservableStateAndPreviewHelpers() async throws {
         let defaults = makeRecordingHotkeySettingsDefaults()
         defer { clearRecordingHotkeySettingsDefaults(defaults) }
