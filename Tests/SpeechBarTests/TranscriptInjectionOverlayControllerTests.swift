@@ -15,6 +15,7 @@ struct TranscriptInjectionOverlayControllerTests {
             targetProvider: dependencies.targetProvider,
             visibleDuration: .seconds(10)
         )
+        let expectedFrame = try #require(dependencies.targetProvider.snapshot?.screenFrame)
         let publishID = UUID()
 
         dependencies.coordinator.publishFeedbackNotifier.notify(
@@ -31,7 +32,7 @@ struct TranscriptInjectionOverlayControllerTests {
         }
 
         #expect(controller.panelIsVisibleForTesting)
-        #expect(controller.panelFrameForTesting == dependencies.targetSnapshot?.screenFrame)
+        #expect(controller.panelFrameForTesting == expectedFrame)
         #expect(controller.panelIgnoresMouseEventsForTesting)
     }
 
@@ -144,7 +145,7 @@ struct TranscriptInjectionOverlayControllerTests {
             )
         )
 
-        try await Task.sleep(for: .milliseconds(50))
+        try await Task.sleep(for: .milliseconds(80))
 
         #expect(controller.activePublishIDForTesting == activePublishID)
         #expect(controller.endingStyleForTesting == .success)

@@ -131,7 +131,7 @@ final class TranscriptInjectionOverlayController: NSObject {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.14
+                context.duration = 0.10
                 panel.animator().alphaValue = 1
             }
         } else {
@@ -143,7 +143,7 @@ final class TranscriptInjectionOverlayController: NSObject {
         guard panel.isVisible else { return }
 
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.16
+            context.duration = 0.10
             panel.animator().alphaValue = 0
         }, completionHandler: { [weak self] in
             Task { @MainActor in

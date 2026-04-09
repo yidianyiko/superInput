@@ -25,11 +25,15 @@ struct TranscriptInjectionOverlayView: View {
                             1
                         )
                         let particles = TranscriptInjectionOverlayMotion.particles(reduceMotion: reduceMotion)
-                        let markerColor = markerColor(for: presentation.endingStyle)
+                        let markerStyle = markerStyle(for: presentation.endingStyle)
+                        let markerScale = TranscriptInjectionOverlayMotion.markerScale(
+                            progress: progress,
+                            endingStyle: presentation.endingStyle
+                        )
 
                         ForEach(particles) { particle in
                             Circle()
-                                .fill(markerColor.opacity(0.94))
+                                .fill(Color.white.opacity(0.96))
                                 .frame(width: particle.size, height: particle.size)
                                 .opacity(
                                     TranscriptInjectionOverlayMotion.particleOpacity(
@@ -48,14 +52,8 @@ struct TranscriptInjectionOverlayView: View {
                         }
 
                         Circle()
-                            .stroke(markerColor, lineWidth: markerLineWidth(for: presentation.endingStyle))
-                            .frame(width: 34, height: 34)
-                            .scaleEffect(
-                                TranscriptInjectionOverlayMotion.markerScale(
-                                    progress: progress,
-                                    endingStyle: presentation.endingStyle
-                                )
-                            )
+                            .stroke(markerStyle.color, lineWidth: markerStyle.lineWidth)
+                            .frame(width: 26 * markerScale, height: 26 * markerScale)
                             .opacity(
                                 TranscriptInjectionOverlayMotion.markerOpacity(
                                     progress: progress,
@@ -73,25 +71,20 @@ struct TranscriptInjectionOverlayView: View {
         .background(Color.clear)
     }
 
-    private func markerColor(
+    private func markerStyle(
         for endingStyle: TranscriptInjectionOverlayEndingStyle
-    ) -> Color {
+    ) -> (color: Color, lineWidth: CGFloat) {
         switch endingStyle {
         case .success:
-            return Color(red: 0.48, green: 0.93, blue: 0.73)
+            return (
+                color: Color.white.opacity(0.9),
+                lineWidth: 1.6
+            )
         case .downgraded:
-            return Color(red: 1.0, green: 0.78, blue: 0.38)
-        }
-    }
-
-    private func markerLineWidth(
-        for endingStyle: TranscriptInjectionOverlayEndingStyle
-    ) -> CGFloat {
-        switch endingStyle {
-        case .success:
-            return 2.5
-        case .downgraded:
-            return 2
+            return (
+                color: Color(red: 0.74, green: 0.86, blue: 1.0).opacity(0.92),
+                lineWidth: 2.0
+            )
         }
     }
 }
