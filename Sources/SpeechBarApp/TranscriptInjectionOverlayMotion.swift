@@ -58,13 +58,9 @@ enum TranscriptInjectionOverlayMotion {
             x: source.x + particle.spawnOffset.width,
             y: source.y + particle.spawnOffset.height
         )
-        let midpoint = CGPoint(
-            x: (source.x + destination.x) * 0.5,
-            y: (source.y + destination.y) * 0.5
-        )
         let control = CGPoint(
-            x: midpoint.x + particle.controlOffset.width,
-            y: midpoint.y + particle.controlOffset.height
+            x: ((source.x + destination.x) / 2) + particle.controlOffset.width,
+            y: max(source.y, destination.y) + particle.controlOffset.height
         )
         let t = clampedProgress
         let oneMinusT = 1 - t
@@ -80,14 +76,14 @@ enum TranscriptInjectionOverlayMotion {
         return max(0, particle.opacity * (1 - (clampedProgress * 0.72)))
     }
 
-    static func markerScale(progress: Double, endingStyle: TranscriptInjectionOverlayEndingStyle) -> Double {
+    static func markerScale(progress: Double, endingStyle: TranscriptInjectionOverlayEndingStyle) -> CGFloat {
         let clampedProgress = clampProgress(progress)
 
         switch endingStyle {
         case .success:
-            return 0.72 + (0.28 * sin(clampedProgress * .pi))
+            return CGFloat(0.72 + (0.28 * sin(clampedProgress * .pi)))
         case .downgraded:
-            return 0.54 + (0.42 * sin(clampedProgress * .pi * 1.5))
+            return CGFloat(0.54 + (0.42 * sin(clampedProgress * .pi * 1.5)))
         }
     }
 
