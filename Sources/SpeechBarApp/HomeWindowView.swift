@@ -382,10 +382,10 @@ struct HomeWindowView: View {
                         .foregroundStyle(palette.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(recordingHotkeySettingsStore.homeHeroHelpText)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(palette.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    RecordingHotkeyHeroHelpText(
+                        store: recordingHotkeySettingsStore,
+                        palette: palette
+                    )
                 }
 
                 Spacer(minLength: 12)
@@ -397,9 +397,9 @@ struct HomeWindowView: View {
                         tint: sessionTint
                     )
 
-                    ShortcutKeyCaps(
-                        palette: palette,
-                        symbols: recordingHotkeySettingsStore.primaryShortcutSymbols
+                    RecordingHotkeyHeroCaps(
+                        store: recordingHotkeySettingsStore,
+                        palette: palette
                     )
                 }
             }
@@ -2780,6 +2780,30 @@ private struct ThemePresetCard: View {
             .shadow(color: isSelected ? palette.accent.opacity(0.14) : Color.black.opacity(0.04), radius: 14, x: 0, y: 10)
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct RecordingHotkeyHeroHelpText: View {
+    @ObservedObject var store: RecordingHotkeySettingsStore
+    let palette: HomeWindowStore.HomeThemePalette
+
+    var body: some View {
+        Text(store.homeHeroHelpText)
+            .font(.system(size: 14, weight: .medium))
+            .foregroundStyle(palette.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct RecordingHotkeyHeroCaps: View {
+    @ObservedObject var store: RecordingHotkeySettingsStore
+    let palette: HomeWindowStore.HomeThemePalette
+
+    var body: some View {
+        ShortcutKeyCaps(
+            palette: palette,
+            symbols: store.primaryShortcutSymbols
+        )
     }
 }
 

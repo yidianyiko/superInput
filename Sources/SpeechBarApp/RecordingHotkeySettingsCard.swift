@@ -175,6 +175,13 @@ struct RecordingHotkeySettingsCard: View {
                         }
                         .buttonStyle(HotkeySecondaryButtonStyle(palette: palette))
                     }
+
+                    if store.diagnostics.registrationStatus == .registrationFailed {
+                        Button("重新尝试注册") {
+                            store.retryRegistration()
+                        }
+                        .buttonStyle(HotkeySecondaryButtonStyle(palette: palette))
+                    }
                 }
 
                 Text(store.customCaptureHelpText)

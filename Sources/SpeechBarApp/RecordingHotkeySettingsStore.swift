@@ -209,6 +209,11 @@ final class RecordingHotkeySettingsStore: ObservableObject, @unchecked Sendable 
         setCustomCombination(preview)
     }
 
+    func retryRegistration() {
+        controller.apply(configuration)
+        diagnostics = controller.diagnosticsSnapshot
+    }
+
     nonisolated static func loadConfiguration(
         from defaults: UserDefaults = .standard
     ) -> RecordingHotkeyConfiguration {

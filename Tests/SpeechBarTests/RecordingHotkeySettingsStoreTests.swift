@@ -189,6 +189,44 @@ struct RecordingHotkeySettingsStoreTests {
         #expect(store.customCombinationPreview == nil)
         #expect(store.effectiveCustomCombination == store.configuration.customCombination)
     }
+
+    @Test
+    @MainActor
+    func retryRegistrationReappliesCurrentConfigurationAfterFailure() throws {
+        let defaults = makeRecordingHotkeySettingsDefaults()
+        defer { clearRecordingHotkeySettingsDefaults(defaults) }
+
+        let configuration = RecordingHotkeyConfiguration(
+            mode: .customCombo,
+            customCombination: RecordingHotkeyCombination(
+                keyCode: UInt32(kVK_ANSI_J),
+                modifiers: UInt32(controlKey | optionKey)
+            )
+        )
+        defaults.set(
+            try JSONEncoder().encode(configuration),
+            forKey: RecordingHotkeySettingsStore.defaultsKey
+        )
+        let controller = MockRecordingHotkeySettingsController(
+            diagnosticsSnapshot: makeDiagnostics(
+                configuration: configuration,
+                registrationStatus: .registrationFailed,
+                requiresAccessibility: false,
+                guidanceText: "The hotkey may already be in use."
+            )
+        )
+
+        let store = RecordingHotkeySettingsStore(defaults: defaults, controller: controller)
+
+        #expect(controller.appliedConfigurations.isEmpty)
+        #expect(store.diagnostics.registrationStatus == .registrationFailed)
+
+        store.retryRegistration()
+
+        #expect(controller.appliedConfigurations == [configuration])
+        #expect(store.diagnostics.configuration == configuration)
+        #expect(store.diagnostics.registrationStatus == .registered)
+    }
 }
 
 @MainActor
