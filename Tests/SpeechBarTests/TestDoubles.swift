@@ -160,6 +160,37 @@ actor MockTranscriptPublisher: TranscriptPublisher {
     }
 }
 
+actor MockWindowSwitcher: WindowSwitching {
+    private var directions: [WindowSwitchDirection] = []
+    var outcome: WindowSwitchOutcome = .switchedWindow
+
+    func switchWindow(direction: WindowSwitchDirection) async -> WindowSwitchOutcome {
+        directions.append(direction)
+        return outcome
+    }
+
+    func snapshot() -> [WindowSwitchDirection] {
+        return directions
+    }
+}
+
+final class MockReturnKeyPressCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func press() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+
+    func snapshot() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+}
+
 actor MockMemoryRecorder: MemoryEventRecording {
     private(set) var recordedEvents: [InputEvent] = []
 

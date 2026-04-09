@@ -60,6 +60,9 @@ let package = Package(
                 "MemoryCore",
                 "MemoryExtraction",
                 "MemoryStorageSQLite"
+            ],
+            resources: [
+                .copy("Resources/HardwareBridge")
             ]
         ),
         .testTarget(

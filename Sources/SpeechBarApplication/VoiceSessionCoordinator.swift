@@ -1,4 +1,5 @@
 import Combine
+import CoreGraphics
 import Foundation
 import MemoryDomain
 import SpeechBarDomain
@@ -44,6 +45,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
     private let credentialProvider: any CredentialProvider
     private let transcriptPublisher: any TranscriptPublisher
     private let windowSwitcher: (any WindowSwitching)?
+    private let returnKeyHandler: @Sendable () -> Void
     private let transcriptTargetCapturer: (any TranscriptTargetCapturing)?
     private let focusedSnapshotProvider: (any FocusedInputSnapshotProviding)?
     private let userProfileProvider: (any UserProfileContextProviding)?
@@ -81,6 +83,19 @@ public final class VoiceSessionCoordinator: ObservableObject {
         credentialProvider: any CredentialProvider,
         transcriptPublisher: any TranscriptPublisher,
         windowSwitcher: (any WindowSwitching)? = nil,
+        returnKeyHandler: @escaping @Sendable () -> Void = {
+            guard let source = CGEventSource(stateID: .combinedSessionState)
+                ?? CGEventSource(stateID: .hidSystemState)
+            else {
+                return
+            }
+
+            let returnKeyCode: CGKeyCode = 36
+            let keyDown = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: true)
+            let keyUp = CGEvent(keyboardEventSource: source, virtualKey: returnKeyCode, keyDown: false)
+            keyDown?.post(tap: .cghidEventTap)
+            keyUp?.post(tap: .cghidEventTap)
+        },
         transcriptTargetCapturer: (any TranscriptTargetCapturing)? = nil,
         focusedSnapshotProvider: (any FocusedInputSnapshotProviding)? = nil,
         userProfileProvider: (any UserProfileContextProviding)? = nil,
@@ -101,6 +116,7 @@ public final class VoiceSessionCoordinator: ObservableObject {
         self.credentialProvider = credentialProvider
         self.transcriptPublisher = transcriptPublisher
         self.windowSwitcher = windowSwitcher
+        self.returnKeyHandler = returnKeyHandler
         self.transcriptTargetCapturer = transcriptTargetCapturer
         self.focusedSnapshotProvider = focusedSnapshotProvider
         self.userProfileProvider = userProfileProvider
@@ -215,6 +231,8 @@ public final class VoiceSessionCoordinator: ObservableObject {
             await endVoiceCapture()
         case .switchWindow(let direction, _):
             await switchWindow(direction)
+        case .pressReturnKey:
+            returnKeyHandler()
         }
     }
 
@@ -224,10 +242,14 @@ public final class VoiceSessionCoordinator: ObservableObject {
             return .startVoiceCapture(source: event.source)
         case .pushToTalkReleased:
             return .stopVoiceCapture(source: event.source)
-        case .rotaryClockwise:
+        case .pressPrimary, .pressSecondary:
+            return .pressReturnKey(source: event.source)
+        case .rotaryClockwise, .switchBoardNext:
             return .switchWindow(direction: .next, source: event.source)
-        case .rotaryCounterClockwise:
+        case .rotaryCounterClockwise, .switchBoardPrevious:
             return .switchWindow(direction: .previous, source: event.source)
+        case .dismissSelected:
+            return .stopVoiceCapture(source: event.source)
         }
     }
 
