@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import CoreGraphics
 import Darwin
 import Foundation
 import MemoryDomain
@@ -710,6 +711,86 @@ public final class FocusedTextTranscriptPublisher: TranscriptPublisher, @uncheck
         return nil
     }
 
+    @MainActor
+    private func frame(for element: AXUIElement) -> CGRect? {
+        guard
+            let origin = pointAttribute(kAXPositionAttribute as CFString, from: element),
+            let size = sizeAttribute(kAXSizeAttribute as CFString, from: element)
+        else {
+            return nil
+        }
+
+        return CGRect(origin: origin, size: size)
+    }
+
+    @MainActor
+    private func pointAttribute(_ attribute: CFString, from element: AXUIElement) -> CGPoint? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard status == .success, let value else {
+            return nil
+        }
+
+        let axValue = value as! AXValue
+        guard AXValueGetType(axValue) == .cgPoint else {
+            return nil
+        }
+
+        var point = CGPoint.zero
+        guard AXValueGetValue(axValue, .cgPoint, &point) else {
+            return nil
+        }
+        return point
+    }
+
+    @MainActor
+    private func sizeAttribute(_ attribute: CFString, from element: AXUIElement) -> CGSize? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard status == .success, let value else {
+            return nil
+        }
+
+        let axValue = value as! AXValue
+        guard AXValueGetType(axValue) == .cgSize else {
+            return nil
+        }
+
+        var size = CGSize.zero
+        guard AXValueGetValue(axValue, .cgSize, &size) else {
+            return nil
+        }
+        return size
+    }
+
+    @MainActor
+    private func transcriptInjectionTargetSnapshot(
+        for target: CapturedFocusTarget
+    ) -> TranscriptInjectionTargetSnapshot? {
+        let application = applicationTracker.application(processIdentifier: target.processIdentifier)
+        let appIdentifier = application?.bundleIdentifier ?? "unknown"
+        let appName = application?.localizedName ?? appIdentifier
+        let elementFrame = target.element.flatMap(frame(for:))
+        let windowFrame = target.windowElement.flatMap(frame(for:))
+        guard let resolvedGeometry = TranscriptInjectionTargetResolver.resolve(
+            elementFrame: elementFrame,
+            windowFrame: windowFrame,
+            screenFrames: NSScreen.screens.map(\.frame)
+        ) else {
+            return nil
+        }
+
+        return TranscriptInjectionTargetSnapshot(
+            processIdentifier: target.processIdentifier,
+            appIdentifier: appIdentifier,
+            appName: appName,
+            screenFrame: resolvedGeometry.screenFrame,
+            windowFrame: windowFrame,
+            elementFrame: elementFrame,
+            destinationPoint: resolvedGeometry.destinationPoint
+        )
+    }
+
 }
 
 extension FocusedTextTranscriptPublisher: TranscriptTargetCapturing {}
@@ -738,6 +819,20 @@ extension FocusedTextTranscriptPublisher: FocusedInputSnapshotProviding {
                 return nil
             }
             return stringValue(for: element)
+        }
+    }
+}
+
+extension FocusedTextTranscriptPublisher: TranscriptInjectionTargetSnapshotProviding {
+    public func currentTranscriptInjectionTargetSnapshot() async -> TranscriptInjectionTargetSnapshot? {
+        let target = await MainActor.run {
+            rememberedTarget ?? captureFocusTarget()
+        }
+        guard let target else {
+            return nil
+        }
+        return await MainActor.run {
+            transcriptInjectionTargetSnapshot(for: target)
         }
     }
 }

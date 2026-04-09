@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 public enum HardwareSourceKind: String, Sendable, Equatable {
@@ -142,6 +143,34 @@ public struct PublishedTranscript: Sendable, Equatable {
     public init(text: String, createdAt: Date = Date()) {
         self.text = text
         self.createdAt = createdAt
+    }
+}
+
+public struct TranscriptInjectionTargetSnapshot: Sendable, Equatable {
+    public let processIdentifier: pid_t
+    public let appIdentifier: String
+    public let appName: String
+    public let screenFrame: CGRect
+    public let windowFrame: CGRect?
+    public let elementFrame: CGRect?
+    public let destinationPoint: CGPoint
+
+    public init(
+        processIdentifier: pid_t,
+        appIdentifier: String,
+        appName: String,
+        screenFrame: CGRect,
+        windowFrame: CGRect?,
+        elementFrame: CGRect?,
+        destinationPoint: CGPoint
+    ) {
+        self.processIdentifier = processIdentifier
+        self.appIdentifier = appIdentifier
+        self.appName = appName
+        self.screenFrame = screenFrame
+        self.windowFrame = windowFrame
+        self.elementFrame = elementFrame
+        self.destinationPoint = destinationPoint
     }
 }
 
@@ -365,6 +394,10 @@ public protocol WindowSwitchPreviewPublishing: Sendable {
 public protocol TranscriptTargetCapturing: Sendable {
     func captureCurrentTarget() async
     func clearCapturedTarget() async
+}
+
+public protocol TranscriptInjectionTargetSnapshotProviding: Sendable {
+    func currentTranscriptInjectionTargetSnapshot() async -> TranscriptInjectionTargetSnapshot?
 }
 
 public protocol SleepClock: Sendable {
